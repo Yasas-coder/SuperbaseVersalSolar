@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Telemetry Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #fff; margin: 0; padding: 20px; }
+        h1 { text-align: center; color: #00e676; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .card { background-color: #1e1e1e; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body>
+
+    <h1>☀️ Live Solar & Battery Monitor</h1>
+    
+    <div class="grid">
+        <div class="card">
+            <h3>Battery Voltage (V)</h3>
+            <canvas id="batteryChart"></canvas>
+        </div>
+        <div class="card">
+            <h3>AC Load (Watts)</h3>
+            <canvas id="loadChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "https://znwuyunwtwurrejowkaz.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_pnvIkUa0rVkghi40HAqlYQ_DNFlitDR"; // Paste your sb_publishable key
+
+        async function loadData() {
+            // Fetch last 30 telemetry entries from Supabase
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/solar_telemetry?select=*&order=created_at.desc&limit=30`, {
+                headers: {
+                    "apikey": SUPABASE_KEY,
+                    "Authorization": `Bearer ${SUPABASE_KEY}`
+                }
+            });
+            
+            const data = await response.json();
+            data.reverse(); // Order chronologically
+
+            const timestamps = data.map(row => new Date(row.created_at).toLocaleTimeString());
+            const batteryV = data.map(row => row.battery_v);
+            const loadW = data.map(row => row.load_w);
+
+            renderChart('batteryChart', timestamps, batteryV, 'Battery V', '#00e676');
+            renderChart('loadChart', timestamps, loadW, 'Load (W)', '#ff5252');
+        }
+
+        function renderChart(canvasId, labels, dataset, labelName, color) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: labelName,
+                        data: dataset,
+                        borderColor: color,
+                        tension: 0.3,
+                        fill: false
+                    }]
+                },
+                options: { responsive: true }
+            });
+        }
+
+        loadData();
+        setInterval(loadData, 10000); // Auto-refresh data every 10 seconds
+    </script>
+</body>
+</html>
