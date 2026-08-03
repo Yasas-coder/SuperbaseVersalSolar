@@ -31,8 +31,11 @@
         const SUPABASE_URL = "https://znwuyunwtwurrejowkaz.supabase.co";
         const SUPABASE_KEY = "sb_publishable_pnvIkUa0rVkghi40HAqlYQ_DNFlitDR"; // Paste your sb_publishable key
 
-        async function loadData() {
-            // Fetch last 30 telemetry entries from Supabase
+        let batteryChartInstance = null;
+    let loadChartInstance = null;
+
+    async function loadData() {
+        try {
             const response = await fetch(`${SUPABASE_URL}/rest/v1/solar_telemetry?select=*&order=created_at.desc&limit=30`, {
                 headers: {
                     "apikey": SUPABASE_KEY,
@@ -41,36 +44,50 @@
             });
             
             const data = await response.json();
+            if(!data || data.length === 0) return;
+
             data.reverse(); // Order chronologically
 
             const timestamps = data.map(row => new Date(row.created_at).toLocaleTimeString());
             const batteryV = data.map(row => row.battery_v);
             const loadW = data.map(row => row.load_w);
 
-            renderChart('batteryChart', timestamps, batteryV, 'Battery V', '#00e676');
-            renderChart('loadChart', timestamps, loadW, 'Load (W)', '#ff5252');
+            batteryChartInstance = renderChart('batteryChart', batteryChartInstance, timestamps, batteryV, 'Battery V', '#00e676');
+            loadChartInstance = renderChart('loadChart', loadChartInstance, timestamps, loadW, 'Load (W)', '#ff5252');
+        } catch (err) {
+            console.error("Error fetching telemetry:", err);
+        }
+    }
+
+    function renderChart(canvasId, chartInstance, labels, dataset, labelName, color) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        
+        // If chart already exists, just update its data instead of recreating
+        if (chartInstance) {
+            chartInstance.data.labels = labels;
+            chartInstance.data.datasets[0].data = dataset;
+            chartInstance.update();
+            return chartInstance;
         }
 
-        function renderChart(canvasId, labels, dataset, labelName, color) {
-            const ctx = document.getElementById(canvasId).getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: labelName,
-                        data: dataset,
-                        borderColor: color,
-                        tension: 0.3,
-                        fill: false
-                    }]
-                },
-                options: { responsive: true }
-            });
-        }
+        return new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: labelName,
+                    data: dataset,
+                    borderColor: color,
+                    tension: 0.3,
+                    fill: false
+                }]
+            },
+            options: { responsive: true }
+        });
+    }
 
-        loadData();
-        setInterval(loadData, 10000); // Auto-refresh data every 10 seconds
+    loadData();
+    setInterval(loadData, 10000); // Auto-refresh data every 10 seconds
     </script>
 </body>
 </html>
