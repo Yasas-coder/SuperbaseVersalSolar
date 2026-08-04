@@ -58,9 +58,9 @@
           <div class="value" id="val-used">-- <span class="unit">kWh</span></div>
         </div>
 
-        <div class="metric-box">
-          <div class="label">Daily Avg Rate</div>
-          <div class="value" id="val-daily">-- <span class="unit">kWh/day</span></div>
+       <div class="metric-box">
+          <div class="label">Used Today</div>
+          <div class="value" id="val-today">-- <span class="unit">kWh</span></div>
         </div>
 
         <div class="metric-box highlight">
@@ -187,28 +187,33 @@
           .limit(1)
           .single();
 
-        if (latestData) {
+if (latestData) {
           const currentReading = latestData.ac_energy || 0;
           const startReading = startData ? (startData.ac_energy || currentReading) : currentReading;
+          
+          // Determine today's starting reading
+          const todayStartReading = todayStartData ? (todayStartData.ac_energy || currentReading) : currentReading;
 
-          // Calculate energy used so far + custom offset
+          // Math: Total Used in Cycle
           const rawUsed = Math.max(0, currentReading - startReading);
           const totalUsed = rawUsed + parseFloat(currentSettings.energy_offset);
 
-          // Calculate cycle durations for projection
+          // Math: Used Today
+          const usedToday = Math.max(0, currentReading - todayStartReading);
+
+          // Calculate cycle durations for Month-End Projection
           const totalCycleMs = cycleEnd - cycleStart;
-          const elapsedMs = Math.max(1000 * 60 * 60, now - cycleStart); // Min 1 hour to avoid division by 0
-          
+          const elapsedMs = Math.max(1000 * 60 * 60, now - cycleStart); 
           const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
           const totalCycleDays = currentSettings.cycle_days;
 
-          // Project forward linearly
+          // Project forward linearly using the cycle average
           const dailyAvg = totalUsed / elapsedDays;
           const forecastedTotal = dailyAvg * totalCycleDays;
 
           // Update UI DOM Elements
           document.getElementById('val-used').innerHTML = `${totalUsed.toFixed(2)} <span class="unit">kWh</span>`;
-          document.getElementById('val-daily').innerHTML = `${dailyAvg.toFixed(2)} <span class="unit">kWh/day</span>`;
+          document.getElementById('val-today').innerHTML = `${usedToday.toFixed(2)} <span class="unit">kWh</span>`;
           document.getElementById('val-forecast').innerHTML = `${forecastedTotal.toFixed(2)} <span class="unit">kWh</span>`;
 
           // Progress bar constraints (cap at 100%)
