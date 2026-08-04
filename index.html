@@ -215,13 +215,13 @@
     loadData();
     fetchLogs();
     setInterval(loadData, 10000);
-    setInterval(fetchLogs, 5000); // Refresh logs every 5 seconds
+    setInterval(fetchLogs, 5000);
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 2. MQTT WEBSOCKET REAL-TIME ENGINE
+    // 2. MQTT WEBSOCKET REAL-TIME ENGINE (SECURE SSL)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const mqttBroker = "broker.hivemq.com";
-    const mqttPort = 8000; // HiveMQ WebSocket Port
+    const mqttPort = 8884; // HiveMQ Secure WSS Port (REQUIRED FOR HTTPS VERCEL)
     const clientID = "VercelDashboard-" + Math.floor(Math.random() * 10000);
 
     const client = new Paho.MQTT.Client(mqttBroker, mqttPort, clientID);
@@ -229,7 +229,8 @@
     client.onConnectionLost = onConnectionLost;
     client.onMessageArrived = onMessageArrived;
 
-    client.connect({ onSuccess: onConnect, onFailure: onFailure });
+    // Connect using SSL (useSSL: true)
+    client.connect({ onSuccess: onConnect, onFailure: onFailure, useSSL: true });
 
     function onConnect() {
         document.getElementById("mqtt-status").innerText = "🟢 Real-time MQTT Connected (HiveMQ)";
@@ -246,7 +247,7 @@
         if (responseObject.errorCode !== 0) {
             document.getElementById("mqtt-status").innerText = "🟡 MQTT Disconnected. Retrying...";
             document.getElementById("mqtt-status").style.color = "#ff9f43";
-            setTimeout(() => client.connect({ onSuccess: onConnect, onFailure: onFailure }), 5000);
+            setTimeout(() => client.connect({ onSuccess: onConnect, onFailure: onFailure, useSSL: true }), 5000);
         }
     }
 
