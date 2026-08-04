@@ -26,6 +26,7 @@
         input[type="number"], input[type="text"] { background: #121212; border: 1px solid #444; color: #fff; padding: 8px; border-radius: 4px; width: calc(100% - 18px); margin: 6px 0; }
         label { font-size: 0.85em; color: #aaa; }
         .sub-box { background: #252525; padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #00adb5; }
+        .terminal { background-color: #000; color: #00ff66; font-family: 'Courier New', Courier, monospace; padding: 15px; border-radius: 6px; height: 200px; overflow-y: auto; font-size: 0.85em; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -34,6 +35,13 @@
     <h1>☀️ Solar Infrastructure Cloud OS</h1>
     
     <div id="mqtt-status" class="status-bar" style="color: #ff9f43;">🔌 Connecting to MQTT Broker...</div>
+
+    <!-- System Info Bar -->
+    <div class="card" style="margin-bottom: 20px; text-align: center;">
+        <p style="margin: 0; font-size: 1.1em;">
+            🌐 <b>ESP32 Local IP:</b> <a id="local-ip-link" href="#" target="_blank" style="color: #00adb5; text-decoration: none; font-weight: bold;">Fetching...</a>
+        </p>
+    </div>
 
     <!-- Live Supabase Graphs -->
     <h2>📊 Live Telemetry Trends</h2>
@@ -48,10 +56,15 @@
         </div>
     </div>
 
+    <!-- Live Event Log Viewer -->
+    <h2>📜 Live ESP32 System Logs</h2>
+    <div class="card">
+        <div id="log-terminal" class="terminal">Loading remote logs from Supabase...</div>
+    </div>
+
     <!-- MQTT Control Matrix -->
     <h2>🎛️ Remote Relay Overrides</h2>
     <div class="grid">
-        <!-- Relay Cards (0 - 3) -->
         <script>
             const relayNames = ["CEB Charger", "Vesak Lantern", "Master Light Switch", "House Light"];
             for (let i = 0; i < 4; i++) {
@@ -60,11 +73,11 @@
                     <h3>Relay ${i + 1}: ${relayNames[i]}</h3>
                     <p>Status: <span id="r_stat_${i}" style="color: #00adb5; font-weight: bold;">UNKNOWN</span></p>
                     <div class="btn-group">
-                        <button class="on" onclick="sendMQTT('solar/relay/${i}', 'ON')">ON</button>
-                        <button class="off" onclick="sendMQTT('solar/relay/${i}', 'OFF')">OFF</button>
-                        <button class="auto" onclick="sendMQTT('solar/relay/${i}', 'AUTOTIME')">TIME</button>
-                        <button class="auto" onclick="sendMQTT('solar/relay/${i}', 'AUTOVOLT')">VOLT</button>
-                        <button class="timer" onclick="sendMQTT('solar/relay/${i}', 'TIMER')">TIMER</button>
+                        <button class="on" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'ON')">ON</button>
+                        <button class="off" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'OFF')">OFF</button>
+                        <button class="auto" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'AUTOTIME')">TIME</button>
+                        <button class="auto" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'AUTOVOLT')">VOLT</button>
+                        <button class="timer" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'TIMER')">TIMER</button>
                     </div>
                 </div>
                 `);
@@ -122,14 +135,14 @@
             <input type="number" step="0.001" id="real_c" placeholder="e.g. 5.230">
             <button class="auto" style="width:100%; margin-top:8px;" onclick="calibrateINA()">Calibrate Current Sensor</button>
             <hr style="border-color:#333; margin:15px 0;">
-            <button class="danger" style="width:100%;" onclick="if(confirm('Execute Remote ESP32 Reboot?')) sendMQTT('solar/system/command', 'REBOOT')">⚠️ Remote System Reboot</button>
+            <button class="danger" style="width:100%;" onclick="if(confirm('Execute Remote ESP32 Reboot?')) sendMQTT('mysolar_lk99/system/command', 'REBOOT')">⚠️ Remote System Reboot</button>
         </div>
     </div>
 </div>
 
 <script>
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 1. SUPABASE LIVE CHARTING ENGINE
+    // 1. SUPABASE LIVE TELEMETRY & LOCAL IP FETCHING
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const SUPABASE_URL = "https://znwuyunwtwurrejowkaz.supabase.co";
     const SUPABASE_KEY = "sb_publishable_pnvIkUa0rVkghi40HAqlYQ_DNFlitDR";
@@ -144,6 +157,15 @@
             });
             const data = await response.json();
             if(!data || data.length === 0) return;
+
+            // Extract Local IP from latest entry
+            const latestEntry = data[0];
+            if (latestEntry.local_ip) {
+                const ipLink = document.getElementById("local-ip-link");
+                ipLink.innerText = latestEntry.local_ip;
+                ipLink.href = `http://${latestEntry.local_ip}`;
+            }
+
             data.reverse();
 
             const timestamps = data.map(row => new Date(row.created_at).toLocaleTimeString());
@@ -154,6 +176,24 @@
             loadChartInstance = renderChart('loadChart', loadChartInstance, timestamps, loadW, 'Load (W)', '#ff2e63');
         } catch (err) {
             console.error("Supabase Fetch Error:", err);
+        }
+    }
+
+    async function fetchLogs() {
+        try {
+            const response = await fetch(`${SUPABASE_URL}/rest/v1/system_logs?select=*&order=created_at.desc&limit=20`, {
+                headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
+            });
+            const logs = await response.json();
+            if (!logs || logs.length === 0) return;
+
+            const terminal = document.getElementById("log-terminal");
+            terminal.innerHTML = logs.map(l => {
+                const time = new Date(l.created_at).toLocaleTimeString();
+                return `[${time}] [${l.level}] ${l.message} (Heap: ${l.free_heap}B)`;
+            }).join("<br>");
+        } catch (err) {
+            console.error("Log Fetch Error:", err);
         }
     }
 
@@ -173,13 +213,15 @@
     }
 
     loadData();
+    fetchLogs();
     setInterval(loadData, 10000);
+    setInterval(fetchLogs, 5000); // Refresh logs every 5 seconds
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 2. MQTT WEBSOCKET REAL-TIME ENGINE
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    const mqttBroker = "broker.emqx.io";
-    const mqttPort = 8084; // WebSocket Port
+    const mqttBroker = "broker.hivemq.com";
+    const mqttPort = 8000; // HiveMQ WebSocket Port
     const clientID = "VercelDashboard-" + Math.floor(Math.random() * 10000);
 
     const client = new Paho.MQTT.Client(mqttBroker, mqttPort, clientID);
@@ -187,12 +229,12 @@
     client.onConnectionLost = onConnectionLost;
     client.onMessageArrived = onMessageArrived;
 
-    client.connect({ onSuccess: onConnect, onFailure: onFailure, useSSL: true });
+    client.connect({ onSuccess: onConnect, onFailure: onFailure });
 
     function onConnect() {
-        document.getElementById("mqtt-status").innerText = "🟢 Real-time MQTT Connected";
+        document.getElementById("mqtt-status").innerText = "🟢 Real-time MQTT Connected (HiveMQ)";
         document.getElementById("mqtt-status").style.color = "#00adb5";
-        client.subscribe("solar/status");
+        client.subscribe("mysolar_lk99/status");
     }
 
     function onFailure(response) {
@@ -204,12 +246,12 @@
         if (responseObject.errorCode !== 0) {
             document.getElementById("mqtt-status").innerText = "🟡 MQTT Disconnected. Retrying...";
             document.getElementById("mqtt-status").style.color = "#ff9f43";
-            setTimeout(() => client.connect({ onSuccess: onConnect, onFailure: onFailure, useSSL: true }), 5000);
+            setTimeout(() => client.connect({ onSuccess: onConnect, onFailure: onFailure }), 5000);
         }
     }
 
     function onMessageArrived(message) {
-        if (message.destinationName === "solar/status") {
+        if (message.destinationName === "mysolar_lk99/status") {
             try {
                 const status = JSON.parse(message.payloadString);
                 if (status.relays) {
@@ -225,6 +267,11 @@
                 if (status.ceb_on) document.getElementById("ceb_on").value = status.ceb_on;
                 if (status.ceb_off) document.getElementById("ceb_off").value = status.ceb_off;
                 if (status.al_v) document.getElementById("al_v").value = status.al_v;
+                if (status.ip) {
+                    const ipLink = document.getElementById("local-ip-link");
+                    ipLink.innerText = status.ip;
+                    ipLink.href = `http://${status.ip}`;
+                }
             } catch (e) {
                 console.log("Status raw text:", message.payloadString);
             }
@@ -247,7 +294,7 @@
         const timer_m = parseInt(document.getElementById(`timer_m_${idx}`).value);
 
         const payload = JSON.stringify({ idx, on_h, off_h, timer_m });
-        sendMQTT("solar/schedule/set", payload);
+        sendMQTT("mysolar_lk99/schedule/set", payload);
     }
 
     function updateConfig() {
@@ -257,14 +304,14 @@
         const al_strobe = parseInt(document.getElementById("al_strobe").value);
 
         const payload = JSON.stringify({ ceb_on, ceb_off, al_v, al_strobe });
-        sendMQTT("solar/config/set", payload);
+        sendMQTT("mysolar_lk99/config/set", payload);
     }
 
     function calibrateINA() {
         const real_c = parseFloat(document.getElementById("real_c").value);
         if (!real_c || real_c <= 0) { alert("Enter valid current in Amperes"); return; }
         const payload = JSON.stringify({ real_c });
-        sendMQTT("solar/calibrate/ina", payload);
+        sendMQTT("mysolar_lk99/calibrate/ina", payload);
     }
 </script>
 
