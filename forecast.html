@@ -143,16 +143,16 @@
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 📊 DATA FETCH & FORECAST CALCULATION
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    async function fetchForecastData() {
+async function fetchForecastData() {
       try {
         // 1. Fetch settings from app_settings table
-        const { data: settingsData, error: settingsError } = await _supabase
+        const { data: settingsData } = await _supabase
           .from('app_settings')
           .select('*')
           .eq('id', 1)
-          .single();
+          .maybeSingle();
 
-        if (!settingsError && settingsData) {
+        if (settingsData) {
           if (settingsData.last_billing_date) currentSettings.last_billing_date = settingsData.last_billing_date;
           if (settingsData.cycle_days) currentSettings.cycle_days = settingsData.cycle_days;
           currentSettings.energy_offset = settingsData.energy_offset || 0.0;
@@ -169,32 +169,45 @@
           `Current Cycle: ${cycleStart.toLocaleDateString()} to ${cycleEnd.toLocaleDateString()} (${currentSettings.cycle_days} Days)`;
 
         // 3. Fetch latest reading from solar_telemetry
-        const { data: latestData, error: latestError } = await _supabase
+        const { data: latestData } = await _supabase
           .from('solar_telemetry')
           .select('ac_energy, created_at')
           .not('ac_energy', 'is', null)
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
-        // 4. Fetch baseline reading at exact start of cycle
-        const { data: startData, error: startError } = await _supabase
+        // 4. Fetch baseline reading at start of cycle (or earliest available)
+        const { data: startData } = await _supabase
           .from('solar_telemetry')
           .select('ac_energy, created_at')
           .gte('created_at', cycleStart.toISOString())
           .not('ac_energy', 'is', null)
           .order('created_at', { ascending: true })
           .limit(1)
-          .single();
+          .maybeSingle();
 
-if (latestData) {
-          const currentReading = latestData.ac_energy || 0;
-          const startReading = startData ? (startData.ac_energy || currentReading) : currentReading;
+        // 5. Fetch baseline reading for midnight today
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+
+        const { data: todayStartData } = await _supabase
+          .from('solar_telemetry')
+          .select('ac_energy')
+          .gte('created_at', startOfToday.toISOString())
+          .not('ac_energy', 'is', null)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestData && latestData.ac_energy !== null) {
+          const currentReading = latestData.ac_energy;
           
-          // Determine today's starting reading
-          const todayStartReading = todayStartData ? (todayStartData.ac_energy || currentReading) : currentReading;
+          // Safe Fallbacks if historical baseline rows don't exist
+          const startReading = (startData && startData.ac_energy !== null) ? startData.ac_energy : currentReading;
+          const todayStartReading = (todayStartData && todayStartData.ac_energy !== null) ? todayStartData.ac_energy : currentReading;
 
-          // Math: Total Used in Cycle
+          // Math: Total Used in Cycle (+ Custom Offset)
           const rawUsed = Math.max(0, currentReading - startReading);
           const totalUsed = rawUsed + parseFloat(currentSettings.energy_offset);
 
@@ -211,12 +224,11 @@ if (latestData) {
           const dailyAvg = totalUsed / elapsedDays;
           const forecastedTotal = dailyAvg * totalCycleDays;
 
-          // Update UI DOM Elements
+          // Render DOM
           document.getElementById('val-used').innerHTML = `${totalUsed.toFixed(2)} <span class="unit">kWh</span>`;
           document.getElementById('val-today').innerHTML = `${usedToday.toFixed(2)} <span class="unit">kWh</span>`;
           document.getElementById('val-forecast').innerHTML = `${forecastedTotal.toFixed(2)} <span class="unit">kWh</span>`;
 
-          // Progress bar constraints (cap at 100%)
           const progressPct = Math.min(100, Math.max(0, (elapsedMs / totalCycleMs) * 100));
           document.getElementById('cycle-progress-bar').style.width = `${progressPct.toFixed(1)}%`;
           document.getElementById('cycle-progress-text').innerText = `${progressPct.toFixed(1)}%`;
@@ -224,8 +236,8 @@ if (latestData) {
           document.getElementById('last-updated').innerText = `Last updated: ${new Date().toLocaleTimeString()}`;
         }
       } catch (err) {
-        console.error("Forecast Calculation Error:", err);
-        document.getElementById('last-updated').innerText = "Failed to update forecast. Check database connection.";
+        console.error("Forecast Error:", err);
+        document.getElementById('last-updated').innerText = "Error calculating forecast. Check browser console.";
       }
     }
 
