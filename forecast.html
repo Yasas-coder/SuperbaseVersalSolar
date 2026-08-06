@@ -80,6 +80,45 @@
       </div>
     </div>
 
+    <!-- DAILY VOLTAGE HEALTH CARD -->
+    <div class="card">
+      <h3>☀️ Daily Battery Health & Solar Peak</h3>
+      <div class="grid-3">
+        <div class="metric-box">
+          <div class="label">Today's Peak Voltage (Max)</div>
+          <div class="value" id="val-max-v">-- <span class="unit">V</span></div>
+          <div class="status-text" id="time-max-v" style="margin-top: 5px;">Time: --:--</div>
+        </div>
+
+        <div class="metric-box">
+          <div class="label">Today's Lowest Voltage (Min)</div>
+          <div class="value" id="val-min-v">-- <span class="unit">V</span></div>
+          <div class="status-text" id="time-min-v" style="margin-top: 5px;">Time: --:--</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DATA EXPORTER CARD -->
+    <div class="card">
+      <h3>💾 Database Exporter (Excel / CSV)</h3>
+      <div class="grid-3">
+        <div class="form-group">
+          <label for="export_start">Start Date</label>
+          <input type="date" id="export_start" required>
+        </div>
+        <div class="form-group">
+          <label for="export_end">End Date</label>
+          <input type="date" id="export_end" required>
+        </div>
+      </div>
+      
+      <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <button onclick="exportToCSV('solar_telemetry')" style="background-color: #00adb5;">📥 Download Telemetry (Sensors)</button>
+        <button onclick="exportToCSV('system_logs')" style="background-color: #ff9f43;">📥 Download Debug Logs</button>
+      </div>
+      <span id="export-status" style="margin-left: 10px; font-size: 0.9em; display: block; margin-top: 15px;"></span>
+    </div>
+
     <!-- SETTINGS CONFIGURATION CARD -->
     <div class="card">
       <h3>⚙️ Cycle Parameters & Offsets</h3>
@@ -273,6 +312,137 @@ async function fetchForecastData() {
         fetchForecastData(); // Recalculate immediately with new parameters
       }
     });
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ☀️ DAILY MIN / MAX VOLTAGE CALCULATOR
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    async function fetchDailyVoltageStats() {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      try {
+        // Query 1: Get the single highest voltage row from today
+        const { data: maxData } = await _supabase
+          .from('solar_telemetry')
+          .select('battery_v, created_at')
+          .gte('created_at', startOfToday.toISOString())
+          .not('battery_v', 'is', null)
+          .order('battery_v', { ascending: false }) // Sort Highest to Lowest
+          .limit(1)
+          .maybeSingle();
+
+        // Query 2: Get the single lowest voltage row from today
+        const { data: minData } = await _supabase
+          .from('solar_telemetry')
+          .select('battery_v, created_at')
+          .gte('created_at', startOfToday.toISOString())
+          .not('battery_v', 'is', null)
+          .order('battery_v', { ascending: true }) // Sort Lowest to Highest
+          .limit(1)
+          .maybeSingle();
+
+        if (maxData) {
+          document.getElementById('val-max-v').innerHTML = `${maxData.battery_v.toFixed(2)} <span class="unit">V</span>`;
+          document.getElementById('time-max-v').innerText = `Time: ${new Date(maxData.created_at).toLocaleTimeString()}`;
+        }
+        if (minData) {
+          document.getElementById('val-min-v').innerHTML = `${minData.battery_v.toFixed(2)} <span class="unit">V</span>`;
+          document.getElementById('time-min-v').innerText = `Time: ${new Date(minData.created_at).toLocaleTimeString()}`;
+        }
+      } catch (err) {
+        console.error("Error fetching voltage stats:", err);
+      }
+    }
+
+    // Call it immediately on load, and add it to your 30-second interval if you want live updates
+    fetchDailyVoltageStats();
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 💾 EXCEL / CSV EXPORTER WITH PAGINATION
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    async function exportToCSV(tableName) {
+      const startInput = document.getElementById('export_start').value;
+      const endInput = document.getElementById('export_end').value;
+      const statusEl = document.getElementById('export-status');
+
+      if (!startInput || !endInput) {
+        statusEl.innerText = "⚠️ Please select both a Start Date and End Date.";
+        statusEl.style.color = "var(--alert-color)";
+        return;
+      }
+
+      statusEl.innerText = `Fetching records from ${tableName}... Please wait.`;
+      statusEl.style.color = "var(--warning-color)";
+
+      let allData = [];
+      let from = 0;
+      let step = 999;
+      let hasMore = true;
+
+      try {
+        // Loop to bypass the 1000 row limit
+        while (hasMore) {
+          const { data, error } = await _supabase
+            .from(tableName)
+            .select('*')
+            .gte('created_at', `${startInput}T00:00:00.000Z`)
+            .lte('created_at', `${endInput}T23:59:59.999Z`)
+            .order('created_at', { ascending: true })
+            .range(from, from + step);
+
+          if (error) throw error;
+
+          if (data.length > 0) {
+            allData = allData.concat(data);
+            from += step + 1;
+          }
+          
+          if (data.length <= step) {
+            hasMore = false;
+          }
+        }
+
+        if (allData.length === 0) {
+          statusEl.innerText = "No data found for this date range.";
+          statusEl.style.color = "var(--alert-color)";
+          return;
+        }
+
+        // Convert the raw JSON array into CSV format
+        const headers = Object.keys(allData[0]);
+        const csvRows = [];
+        csvRows.push(headers.join(',')); // Add header row
+
+        for (const row of allData) {
+          const values = headers.map(header => {
+            const val = row[header] !== null ? row[header] : '';
+            const escaped = ('' + val).replace(/"/g, '""'); // Escape quotes for Excel safety
+            return `"${escaped}"`;
+          });
+          csvRows.push(values.join(','));
+        }
+
+        const csvString = csvRows.join('\n');
+        
+        // Create a downloadable Blob file inside the browser
+        const blob = new Blob([csvString], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Solar_${tableName}_${startInput}_to_${endInput}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        statusEl.innerText = `✅ Successfully downloaded ${allData.length} rows!`;
+        statusEl.style.color = "var(--accent-color)";
+
+      } catch (err) {
+        console.error("Export Error:", err);
+        statusEl.innerText = "Error exporting data. Check console.";
+        statusEl.style.color = "var(--alert-color)";
+      }
+    }
 
     // Auto-refresh loop
     fetchForecastData();
