@@ -66,8 +66,10 @@ Solar Telemetry Summary (Past 24 Hours):
 """
 
 # 6. Generate AI Insight via Gemini
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+from google import genai
+
+# Explicitly pass the API key from your GitHub secrets
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 prompt = f"""
 You are an expert renewable energy assistant. Analyze the following 24-hour solar system data and generate a clear, concise daily email report for the system owner.
@@ -82,8 +84,12 @@ Please include:
 Keep the tone professional, concise, and easy to read on a phone.
 """
 
-ai_response = model.generate_content(prompt)
-ai_analysis = ai_response.text
+# Call the model using the new generate_content syntax
+response = client.models.generate_content(
+    model='gemini-1.5-flash',
+    contents=prompt,
+)
+ai_analysis = response.text
 
 print("--- AI Generated Insight ---")
 print(ai_analysis)
