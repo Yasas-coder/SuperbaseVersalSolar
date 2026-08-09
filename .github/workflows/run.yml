@@ -1,22 +1,27 @@
-name: Test Supabase Connection
-
+name: Daily Solar Insight AI
 on:
-  workflow_dispatch:
+  schedule:
+    - cron: '0 1 * * *' # Runs every day at 1:00 AM UTC
+  workflow_dispatch: # Allows you to trigger it manually
 
 jobs:
-  test-supabase:
+  run-ai-agent:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4.2.2
-
-      - name: Setup Python
-        uses: actions/setup-python@v5.4.0
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
-      - name: Install Dependencies
+          
+      - name: Install dependencies
         run: pip install requests
-
-      - name: Execute Python Script
-        run: python agent.py
+        # add your AI library (like google-generativeai or openai) here too
+        
+      - name: Run AI Insight Script
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          # Don't forget to pass your AI_API_KEY and EMAIL passwords here too!
+        run: python daily_insights.py
