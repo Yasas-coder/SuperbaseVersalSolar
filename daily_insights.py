@@ -5,7 +5,9 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
-import google.generativeai as genai
+
+# Import the NEW Google GenAI SDK
+from google import genai
 
 # 1. Load Secrets
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
@@ -31,7 +33,7 @@ now = datetime.utcnow()
 yesterday = now - timedelta(days=1)
 start_time_iso = yesterday.isoformat()
 
-# 4. Fetch full 24h data from Supabase (&limit=3000 to bypass default 1000 row cap)
+# 4. Fetch full 24h data from Supabase
 table_name = "solar_telemetry"
 url = f"{SUPABASE_URL}/rest/v1/{table_name}?created_at=gte.{start_time_iso}&select=battery_v,battery_a,load_w,ac_energy,created_at&limit=3000"
 
@@ -65,10 +67,7 @@ Solar Telemetry Summary (Past 24 Hours):
 - Total Data Points Analyzed: {len(data)} rows
 """
 
-# 6. Generate AI Insight via Gemini
-from google import genai
-
-# Explicitly pass the API key from your GitHub secrets
+# 6. Generate AI Insight via Gemini (Using the new SDK syntax)
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 prompt = f"""
@@ -84,7 +83,6 @@ Please include:
 Keep the tone professional, concise, and easy to read on a phone.
 """
 
-# Call the model using the new generate_content syntax
 response = client.models.generate_content(
     model='gemini-1.5-flash',
     contents=prompt,
@@ -94,7 +92,7 @@ ai_analysis = response.text
 print("--- AI Generated Insight ---")
 print(ai_analysis)
 
-# 7. Send Email directly via SMTP (Your own email)
+# 7. Send Email directly via SMTP
 try:
     msg = MIMEMultipart()
     msg['From'] = SENDER_EMAIL
