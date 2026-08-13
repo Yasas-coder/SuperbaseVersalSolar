@@ -66,7 +66,7 @@ CRITICAL INSTRUCTIONS:
    - Paragraph 1: State the total "Used So Far" and the "Projected Month End" forecast.
    - Paragraph 2: State "Used Today".
    - Paragraph 3: Provide brief, professional data insights.
-   - Paragraph 4: State the exact peak battery voltage and the exact time it occurred.
+   - Paragraph 4: State the exact peak battery voltage, the exact time, Lowest Battery VOltage and the exact time it occurred.
 3. TONE: DO NOT explain system architecture. DO NOT tell the user that the AC and DC systems are separate. Just present the numbers smoothly.
 
 Data to translate and analyze:
