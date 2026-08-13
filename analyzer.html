@@ -129,8 +129,8 @@
             const startISO = new Date(startDate).toISOString();
             const endISO = new Date(endDate).toISOString();
 
-            // Fetch data (Limit to 10,000 to prevent browser crashes on huge date ranges)
-            const url = `${SUPABASE_URL}/rest/v1/solar_telemetry?created_at=gte.${startISO}&created_at=lte.${endISO}&select=created_at,battery_v,load_w&order=created_at.asc&limit=10000`;
+            // Fetch data descending (newest first) so the latest times are never cut off by the row limit
+            const url = `${SUPABASE_URL}/rest/v1/solar_telemetry?created_at=gte.${startISO}&created_at=lte.${endISO}&select=created_at,battery_v,load_w&order=created_at.desc&limit=10000`;
 
             try {
                 const response = await fetch(url, {
@@ -140,7 +140,10 @@
                     }
                 });
                 
-                const data = await response.json();
+                let data = await response.json();
+                
+                // Flip the array so it draws left-to-right (oldest to newest) on the chart
+                data.reverse();
 
                 // Process data for ApexCharts (Format: [[timestamp, value], [timestamp, value]])
                 const voltageData = [];
