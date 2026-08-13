@@ -168,7 +168,18 @@
                 const voltageData = [];
                 const loadData = [];
 
-                allData.forEach(row => {
+                // --- DOWNSAMPLING LOGIC ---
+                // Limit the chart to draw a maximum of 3,000 points to prevent the browser from giving up
+                const maxPoints = 3000; 
+                const step = Math.max(1, Math.ceil(allData.length / maxPoints)); 
+                
+                const voltageData = [];
+                const loadData = [];
+
+                // We use a standard for-loop instead of forEach so we can skip rows based on the 'step'
+                for (let i = 0; i < allData.length; i += step) {
+                    let row = allData[i];
+                    
                     // Timezone Fix
                     let timeString = row.created_at;
                     if (!timeString.endsWith('Z') && !timeString.includes('+')) {
@@ -178,7 +189,9 @@
 
                     if (row.battery_v !== null) voltageData.push([timestamp, row.battery_v]);
                     if (row.load_w !== null) loadData.push([timestamp, row.load_w]);
-                });
+                }
+
+                renderCharts(voltageData, loadData););
 
                 renderCharts(voltageData, loadData);
             } catch (error) {
