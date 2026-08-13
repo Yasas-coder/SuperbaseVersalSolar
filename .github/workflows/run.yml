@@ -2,7 +2,7 @@ name: Daily Solar Insight AI
 
 on:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '30 0,2,4,6,8,10,12,14,16 * * *'
   workflow_dispatch:
 
 jobs:
