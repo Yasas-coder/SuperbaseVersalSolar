@@ -87,7 +87,9 @@ sl_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
 try:
     msg = MIMEMultipart()
     msg['From'] = SENDER_EMAIL
-    msg['To'] = RECEIVER_EMAIL
+    
+    # This keeps the comma-separated string for the visible "To:" header in the email
+    msg['To'] = RECEIVER_EMAIL 
     msg['Subject'] = f"⚡ දෛනික සූර්ය බලශක්ති වාර්තාව - {sl_now.strftime('%Y-%m-%d')}"
     
     msg.attach(MIMEText(ai_analysis, 'plain', 'utf-8'))
@@ -96,9 +98,12 @@ try:
     server.starttls()
     server.login(SENDER_EMAIL, SENDER_PASSWORD)
     
-    server.sendmail(SENDER_EMAIL, RECEIVER_EMAIL, msg.as_string())
+    # Convert your comma-separated secret into a proper list for the SMTP server
+    recipient_list = [email.strip() for email in RECEIVER_EMAIL.split(',')]
+    
+    server.sendmail(SENDER_EMAIL, recipient_list, msg.as_string())
     server.quit()
     
-    print("Email sent successfully!")
+    print(f"Email sent successfully to: {recipient_list}")
 except Exception as e:
-    print(f"Failed to send email: {e}")
+    print(f"Failed to send email: {e}"))
