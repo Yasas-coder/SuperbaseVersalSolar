@@ -147,7 +147,13 @@
                 const loadData = [];
 
                data.forEach(row => {
-                    const timestamp = new Date(row.created_at).getTime();
+                    // Force the browser to read the Supabase timestamp as UTC
+                    let timeString = row.created_at;
+                    if (!timeString.endsWith('Z') && !timeString.includes('+')) {
+                        timeString += 'Z'; 
+                    }
+                    const timestamp = new Date(timeString).getTime();
+
                     if (row.battery_v !== null) voltageData.push([timestamp, row.battery_v]);
                     if (row.load_w !== null) loadData.push([timestamp, row.load_w]);
                 });
