@@ -19,6 +19,10 @@ jobs:
       - name: Install dependencies
         run: pip install requests google-genai
 
+      
+          pip install playwright google-genai
+          playwright install chromium
+
       - name: Run AI Insight Script
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
