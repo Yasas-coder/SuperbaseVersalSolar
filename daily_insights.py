@@ -106,4 +106,4 @@ try:
     
     print(f"Email sent successfully to: {recipient_list}")
 except Exception as e:
-    print(f"Failed to send email: {e}"))
+    print(f"Failed to send email: {e}")
