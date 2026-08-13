@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Data Analyzer</title>
+    
+    <!-- Load ApexCharts -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent: #00e676;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        input[type="datetime-local"] {
+            background: #2d2d2d;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 5px;
+            color-scheme: dark;
+        }
+        button {
+            background: var(--accent);
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        button:hover {
+            background: #00c853;
+        }
+        .chart-container {
+            background: var(--panel-bg);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        #loading {
+            display: none;
+            color: var(--accent);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2>⚡ Interactive Solar Analyzer</h2>
+        <div class="control-group">
+            <label>Start:</label>
+            <input type="datetime-local" id="start-date">
+            
+            <label>End:</label>
+            <input type="datetime-local" id="end-date">
+            
+            <button onclick="fetchAndRenderData()">Analyze Data</button>
+            <span id="loading">Loading data...</span>
+        </div>
+    </div>
+
+    <!-- Chart Divs -->
+    <div class="chart-container">
+        <div id="voltageChart"></div>
+    </div>
+    
+    <div class="chart-container">
+        <div id="loadChart"></div>
+    </div>
+
+    <script>
+        // --- 1. SETUP SUPABASE CREDENTIALS ---
+        const SUPABASE_URL = "YOUR_SUPABASE_URL"; 
+        const SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY"; 
+        
+        let voltChartInstance = null;
+        let loadChartInstance = null;
+
+        // Set default dates (Last 24 hours) on page load
+        window.onload = () => {
+            const now = new Date();
+            const yesterday = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+            
+            // Format for datetime-local input (YYYY-MM-DDThh:mm)
+            document.getElementById('start-date').value = yesterday.toISOString().slice(0,16);
+            document.getElementById('end-date').value = now.toISOString().slice(0,16);
+            
+            fetchAndRenderData();
+        };
+
+        async function fetchAndRenderData() {
+            document.getElementById('loading').style.display = 'inline';
+            
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+
+            // Convert to UTC ISO strings for Supabase querying
+            const startISO = new Date(startDate).toISOString();
+            const endISO = new Date(endDate).toISOString();
+
+            // Fetch data (Limit to 10,000 to prevent browser crashes on huge date ranges)
+            const url = `${SUPABASE_URL}/rest/v1/solar_telemetry?created_at=gte.${startISO}&created_at=lte.${endISO}&select=created_at,battery_v,load_w&order=created_at.asc&limit=10000`;
+
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                    }
+                });
+                
+                const data = await response.json();
+
+                // Process data for ApexCharts (Format: [[timestamp, value], [timestamp, value]])
+                const voltageData = [];
+                const loadData = [];
+
+                data.forEach(row => {
+                    const timestamp = new Date(row.created_at).getTime();
+                    if (row.battery_v !== null) voltageData.push([timestamp, row.battery_v]);
+                    if (row.load_w !== null) loadData.push([timestamp, row.load_w]);
+                });
+
+                renderCharts(voltageData, loadData);
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                alert("Failed to fetch data from Supabase. Check console.");
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function renderCharts(voltageData, loadData) {
+            // Common Chart Options for synchronized zooming
+            const commonOptions = {
+                chart: {
+                    type: 'area',
+                    height: 350,
+                    background: '#1e1e1e',
+                    animations: { enabled: false },
+                    toolbar: {
+                        autoSelected: 'zoom' // Default tool is zoom
+                    }
+                },
+                theme: { mode: 'dark' },
+                dataLabels: { enabled: false },
+                stroke: { curve: 'smooth', width: 2 },
+                xaxis: {
+                    type: 'datetime',
+                    labels: { datetimeUTC: false } // Shows time in your local timezone
+                },
+                tooltip: { x: { format: 'dd MMM yyyy HH:mm:ss' } }
+            };
+
+            // --- VOLTAGE CHART ---
+            const voltOptions = {
+                ...commonOptions,
+                series: [{ name: 'Battery Voltage (V)', data: voltageData }],
+                colors: ['#00e676'],
+                title: { text: 'Battery Voltage', align: 'left', style: { color: '#fff' } },
+                yaxis: { 
+                    title: { text: 'Volts' },
+                    decimalsInFloat: 2,
+                    forceNiceScale: true
+                }
+            };
+
+            // --- LOAD CHART ---
+            const loadOptions = {
+                ...commonOptions,
+                series: [{ name: 'AC Load (W)', data: loadData }],
+                colors: ['#ff3d00'],
+                title: { text: 'AC Power Load', align: 'left', style: { color: '#fff' } },
+                yaxis: { 
+                    title: { text: 'Watts' },
+                    decimalsInFloat: 0
+                }
+            };
+
+            // Destroy old instances if they exist (to allow updating)
+            if (voltChartInstance) voltChartInstance.destroy();
+            if (loadChartInstance) loadChartInstance.destroy();
+
+            // Render New Charts
+            voltChartInstance = new ApexCharts(document.querySelector("#voltageChart"), voltOptions);
+            loadChartInstance = new ApexCharts(document.querySelector("#loadChart"), loadOptions);
+
+            voltChartInstance.render();
+            loadChartInstance.render();
+        }
+    </script>
+</body>
+</html>
