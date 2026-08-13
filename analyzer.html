@@ -120,37 +120,56 @@
         };
 
         async function fetchAndRenderData() {
-            document.getElementById('loading').style.display = 'inline';
+            const loadingText = document.getElementById('loading');
+            loadingText.style.display = 'inline';
+            loadingText.innerText = 'Initializing...';
             
             const startDate = document.getElementById('start-date').value;
             const endDate = document.getElementById('end-date').value;
 
-            // Convert to UTC ISO strings for Supabase querying
+            // Convert to UTC ISO strings
             const startISO = new Date(startDate).toISOString();
             const endISO = new Date(endDate).toISOString();
 
-            // Fetch data descending (newest first) so the latest times are never cut off by the row limit
-            const url = `${SUPABASE_URL}/rest/v1/solar_telemetry?created_at=gte.${startISO}&created_at=lte.${endISO}&select=created_at,battery_v,load_w&order=created_at.desc&limit=10000`;
+            let allData = [];
+            let offset = 0;
+            const limit = 10000;
+            let keepFetching = true;
 
             try {
-                const response = await fetch(url, {
-                    headers: {
-                        'apikey': SUPABASE_KEY,
-                        'Authorization': `Bearer ${SUPABASE_KEY}`
-                    }
-                });
-                
-                let data = await response.json();
-                
-                // Flip the array so it draws left-to-right (oldest to newest) on the chart
-                data.reverse();
+                // Loop to fetch data in chunks until no more data is left
+                while (keepFetching) {
+                    loadingText.innerText = `Downloading... (${allData.length} rows)`;
+                    
+                    // Notice the new &offset parameter added to the URL
+                    const url = `${SUPABASE_URL}/rest/v1/solar_telemetry?created_at=gte.${startISO}&created_at=lte.${endISO}&select=created_at,battery_v,load_w&order=created_at.asc&limit=${limit}&offset=${offset}`;
 
-                // Process data for ApexCharts (Format: [[timestamp, value], [timestamp, value]])
+                    const response = await fetch(url, {
+                        headers: {
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${SUPABASE_KEY}`
+                        }
+                    });
+                    
+                    const chunk = await response.json();
+                    allData = allData.concat(chunk);
+
+                    // If Supabase returns exactly 10,000 rows, there is likely more data waiting
+                    if (chunk.length === limit) {
+                        offset += limit; // Move the starting point forward for the next loop
+                    } else {
+                        keepFetching = false; // We got a chunk smaller than 10,000, meaning we reached the end!
+                    }
+                }
+
+                loadingText.innerText = 'Drawing charts...';
+
+                // Process ALL the collected data for the charts
                 const voltageData = [];
                 const loadData = [];
 
-               data.forEach(row => {
-                    // Force the browser to read the Supabase timestamp as UTC
+                allData.forEach(row => {
+                    // Timezone Fix
                     let timeString = row.created_at;
                     if (!timeString.endsWith('Z') && !timeString.includes('+')) {
                         timeString += 'Z'; 
@@ -166,7 +185,7 @@
                 console.error("Error fetching data:", error);
                 alert("Failed to fetch data from Supabase. Check console.");
             } finally {
-                document.getElementById('loading').style.display = 'none';
+                loadingText.style.display = 'none';
             }
         }
 
