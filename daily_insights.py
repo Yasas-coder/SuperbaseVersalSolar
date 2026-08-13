@@ -18,7 +18,11 @@ VERCEL_URL = "https://superbase-versal-solar.vercel.app/forecast.html"
 print("Booting virtual browser and loading Vercel...")
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
-    page = browser.new_page()
+    
+    # Force the virtual browser to be in Sri Lanka's timezone
+    context = browser.new_context(timezone_id="Asia/Colombo")
+    page = context.new_page()
+    
     page.goto(VERCEL_URL)
     
     # Wait up to 15 seconds for your JS to fetch Supabase and replace the "--" loading states
