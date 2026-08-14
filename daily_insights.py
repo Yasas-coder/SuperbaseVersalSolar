@@ -74,7 +74,7 @@ Data to translate and analyze:
 
 print("Generating Sinhala translation via Gemini...")
 response = client.models.generate_content(
-    model='gemini-2.5-flash',
+    model='gemini-3.5-flash-lite',
     contents=prompt,
 )
 ai_analysis = response.text
