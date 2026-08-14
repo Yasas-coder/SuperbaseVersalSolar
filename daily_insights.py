@@ -1,5 +1,6 @@
 import os
 import smtplib
+import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
@@ -11,8 +12,10 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "").strip()
 SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD", "").strip()
 RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL", "").strip()
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
 
-# 2. Scrape the Live Vercel Website
+# 2. Scrape the Live Vercel Website for AC Data
 VERCEL_URL = "https://superbase-versal-solar.vercel.app/forecast.html"
 
 print("Booting virtual browser and loading Vercel...")
@@ -41,9 +44,27 @@ with sync_playwright() as p:
     
     browser.close()
 
-print(f"Scraped Data: Today={used_today}, Total={used_so_far}, MaxV={max_v}")
+# 3. Fetch Live SOC Directly from Supabase
+print("Fetching latest SOC from Supabase...")
+current_soc = "N/A"
+try:
+    if SUPABASE_URL and SUPABASE_KEY:
+        headers = {
+            "apikey": SUPABASE_KEY, 
+            "Authorization": f"Bearer {SUPABASE_KEY}"
+        }
+        # Grab the absolute newest row to get the live SOC
+        resp = requests.get(f"{SUPABASE_URL}/rest/v1/solar_telemetry?select=soc&order=created_at.desc&limit=1", headers=headers)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data and 'soc' in data[0] and data[0]['soc'] is not None:
+                current_soc = f"{data[0]['soc']}%"
+except Exception as e:
+    print(f"Failed to fetch SOC from Supabase: {e}")
 
-# 3. Build AI Prompt (Updated to include SOC metrics)
+print(f"Scraped Data: Today={used_today}, Total={used_so_far}, MaxV={max_v}, SOC={current_soc}")
+
+# 4. Build AI Prompt (Updated with SOC and SOH metrics)
 system_data_summary = f"""
 -- AC SYSTEM --
 - Used So Far: {used_so_far}
@@ -51,6 +72,8 @@ system_data_summary = f"""
 - Used Today: {used_today}
 
 -- DC BATTERY SYSTEM (52Ah LiFePO4) --
+- Current State of Charge (SOC): {current_soc}
+- Estimated State of Health (SOH): 100%
 - Today's Peak Voltage: {max_v} ({max_v_time})
 - Today's Lowest Voltage: {min_v} ({min_v_time})
 """
@@ -65,8 +88,8 @@ CRITICAL INSTRUCTIONS:
 2. STRUCTURE ORDER: 
    - Paragraph 1: State the total "Used So Far" and the "Projected Month End" forecast.
    - Paragraph 2: State "Used Today".
-   - Paragraph 3: State the exact peak battery voltage, the exact time, Lowest Battery Voltage, and the exact time it occurred. Keep in mind this is a 52Ah LiFePO4 battery setup.
-3. TONE: DO NOT explain system architecture. DO NOT tell the user that the AC and DC systems are separate. Just present the numbers smoothly. No explanations, Just give data in sinhala and english
+   - Paragraph 3: State the Current SOC (State of Charge), the Estimated SOH (100%), the exact peak battery voltage with its time, and the Lowest Battery Voltage with its time. Mention it is a 52Ah LiFePO4 battery setup.
+3. TONE: DO NOT explain system architecture. DO NOT tell the user that the AC and DC systems are separate. Just present the numbers smoothly. No explanations, Just give data in sinhala and english.
 
 Data to translate and analyze:
 {system_data_summary}
@@ -79,7 +102,7 @@ response = client.models.generate_content(
 )
 ai_analysis = response.text
 
-# 4. Send Email
+# 5. Send Email
 # Adjust to Sri Lanka time for the Subject Line
 sl_now = datetime.utcnow() + timedelta(hours=5, minutes=30)
 
