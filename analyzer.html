@@ -14,6 +14,7 @@
             --panel-bg: #1e1e1e;
             --text-color: #e0e0e0;
             --accent: #00e676;
+            --soc-color: #4cd137;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -57,8 +58,18 @@
             font-weight: bold;
             transition: 0.2s;
         }
-        button:hover {
-            background: #00c853;
+        button:hover { background: #00c853; }
+        .badges {
+            display: flex;
+            gap: 10px;
+        }
+        .badge {
+            background: #333;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            font-weight: bold;
+            border-left: 4px solid var(--soc-color);
         }
         .chart-container {
             background: var(--panel-bg);
@@ -67,55 +78,48 @@
             margin-bottom: 20px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
-        #loading {
-            display: none;
-            color: var(--accent);
-            font-weight: bold;
-        }
+        #loading { display: none; color: var(--accent); font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <h2>⚡ Interactive Solar Analyzer</h2>
+        <div>
+            <h2 style="margin: 0 0 10px 0;">⚡ Interactive Solar Analyzer</h2>
+            <div class="badges">
+                <div class="badge">Battery: 52Ah LiFePO4</div>
+                <div class="badge" style="border-left-color: #f1c40f;">Estimated SOH: 100% (Calibrating...)</div>
+            </div>
+        </div>
         <div class="control-group">
             <label>Start:</label>
             <input type="datetime-local" id="start-date">
-            
             <label>End:</label>
             <input type="datetime-local" id="end-date">
-            
             <button onclick="fetchAndRenderData()">Analyze Data</button>
             <span id="loading">Loading data...</span>
         </div>
     </div>
 
     <!-- Chart Divs -->
-    <div class="chart-container">
-        <div id="voltageChart"></div>
-    </div>
-    
-    <div class="chart-container">
-        <div id="loadChart"></div>
-    </div>
+    <div class="chart-container"><div id="socChart"></div></div>
+    <div class="chart-container"><div id="voltageChart"></div></div>
+    <div class="chart-container"><div id="loadChart"></div></div>
 
     <script>
         // --- 1. SETUP SUPABASE CREDENTIALS ---
         const SUPABASE_URL = "https://znwuyunwtwurrejowkaz.supabase.co"; 
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpud3V5dW53dHd1cnJlam93a2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzI1MzYsImV4cCI6MjEwMTM0ODUzNn0.K5M2TbML6mWuE6O5uLkIsMIaaun1hmAl8EJeVlsoKrI"; 
         
+        let socChartInstance = null;
         let voltChartInstance = null;
         let loadChartInstance = null;
 
-        // Set default dates (Last 24 hours) on page load
         window.onload = () => {
             const now = new Date();
             const yesterday = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-            
-            // Format for datetime-local input (YYYY-MM-DDThh:mm)
             document.getElementById('start-date').value = yesterday.toISOString().slice(0,16);
             document.getElementById('end-date').value = now.toISOString().slice(0,16);
-            
             fetchAndRenderData();
         };
 
@@ -126,8 +130,6 @@
             
             const startDate = document.getElementById('start-date').value;
             const endDate = document.getElementById('end-date').value;
-
-            // Convert to UTC ISO strings
             const startISO = new Date(startDate).toISOString();
             const endISO = new Date(endDate).toISOString();
 
@@ -137,57 +139,47 @@
             let keepFetching = true;
 
             try {
-                // Loop to fetch data in chunks until no more data is left
                 while (keepFetching) {
                     loadingText.innerText = `Downloading... (${allData.length} rows)`;
-                    
-                    // Notice the new &offset parameter added to the URL
-                    const url = `${SUPABASE_URL}/rest/v1/solar_telemetry?created_at=gte.${startISO}&created_at=lte.${endISO}&select=created_at,battery_v,load_w&order=created_at.asc&limit=${limit}&offset=${offset}`;
+                    // Updated Supabase query to include 'soc'
+                    const url = `${SUPABASE_URL}/rest/v1/solar_telemetry?created_at=gte.${startISO}&created_at=lte.${endISO}&select=created_at,battery_v,load_w,soc&order=created_at.asc&limit=${limit}&offset=${offset}`;
 
                     const response = await fetch(url, {
-                        headers: {
-                            'apikey': SUPABASE_KEY,
-                            'Authorization': `Bearer ${SUPABASE_KEY}`
-                        }
+                        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
                     });
                     
                     const chunk = await response.json();
                     allData = allData.concat(chunk);
 
-                    // If Supabase returns exactly 10,000 rows, there is likely more data waiting
                     if (chunk.length === limit) {
-                        offset += limit; // Move the starting point forward for the next loop
+                        offset += limit; 
                     } else {
-                        keepFetching = false; // We got a chunk smaller than 10,000, meaning we reached the end!
+                        keepFetching = false; 
                     }
                 }
 
                 loadingText.innerText = 'Drawing charts...';
 
-                // --- DOWNSAMPLING LOGIC ---
-                // Limit the chart to draw a maximum of 3,000 points to prevent the browser from giving up
                 const maxPoints = 3000; 
                 const step = Math.max(1, Math.ceil(allData.length / maxPoints)); 
                 
+                const socData = [];
                 const voltageData = [];
                 const loadData = [];
 
-                // We use a standard for-loop instead of forEach so we can skip rows based on the 'step'
                 for (let i = 0; i < allData.length; i += step) {
                     let row = allData[i];
                     
-                    // Timezone Fix
                     let timeString = row.created_at;
-                    if (!timeString.endsWith('Z') && !timeString.includes('+')) {
-                        timeString += 'Z'; 
-                    }
+                    if (!timeString.endsWith('Z') && !timeString.includes('+')) timeString += 'Z'; 
                     const timestamp = new Date(timeString).getTime();
 
+                    if (row.soc !== null && row.soc !== undefined) socData.push([timestamp, row.soc]);
                     if (row.battery_v !== null) voltageData.push([timestamp, row.battery_v]);
                     if (row.load_w !== null) loadData.push([timestamp, row.load_w]);
                 }
 
-                renderCharts(voltageData, loadData);
+                renderCharts(socData, voltageData, loadData);
                 
             } catch (error) {
                 console.error("Error fetching data:", error);
@@ -197,61 +189,61 @@
             }
         }
 
-        function renderCharts(voltageData, loadData) {
-            // Common Chart Options for synchronized zooming
+        function renderCharts(socData, voltageData, loadData) {
             const commonOptions = {
                 chart: {
-                    type: 'area',
-                    height: 350,
-                    background: '#1e1e1e',
+                    type: 'area', height: 250, background: '#1e1e1e',
                     animations: { enabled: false },
-                    toolbar: {
-                        autoSelected: 'zoom' // Default tool is zoom
-                    }
+                    toolbar: { autoSelected: 'zoom' },
+                    group: 'solar-sync', // This links all 3 charts together!
+                    id: 'base-chart'
                 },
                 theme: { mode: 'dark' },
                 dataLabels: { enabled: false },
                 stroke: { curve: 'smooth', width: 2 },
-                xaxis: {
-                    type: 'datetime',
-                    labels: { datetimeUTC: false } // Shows time in your local timezone
-                },
+                xaxis: { type: 'datetime', labels: { datetimeUTC: false } },
                 tooltip: { x: { format: 'dd MMM yyyy HH:mm:ss' } }
+            };
+
+            // --- SOC CHART ---
+            const socOptions = {
+                ...commonOptions,
+                chart: { ...commonOptions.chart, id: 'soc-chart' },
+                series: [{ name: 'State of Charge (%)', data: socData }],
+                colors: ['#4cd137'],
+                title: { text: 'Battery SOC (%)', align: 'left', style: { color: '#fff' } },
+                yaxis: { title: { text: '%' }, min: 0, max: 100, decimalsInFloat: 1 }
             };
 
             // --- VOLTAGE CHART ---
             const voltOptions = {
                 ...commonOptions,
+                chart: { ...commonOptions.chart, id: 'volt-chart' },
                 series: [{ name: 'Battery Voltage (V)', data: voltageData }],
                 colors: ['#00e676'],
                 title: { text: 'Battery Voltage', align: 'left', style: { color: '#fff' } },
-                yaxis: { 
-                    title: { text: 'Volts' },
-                    decimalsInFloat: 2,
-                    forceNiceScale: true
-                }
+                yaxis: { title: { text: 'Volts' }, decimalsInFloat: 2, forceNiceScale: true }
             };
 
             // --- LOAD CHART ---
             const loadOptions = {
                 ...commonOptions,
+                chart: { ...commonOptions.chart, id: 'load-chart' },
                 series: [{ name: 'AC Load (W)', data: loadData }],
                 colors: ['#ff3d00'],
                 title: { text: 'AC Power Load', align: 'left', style: { color: '#fff' } },
-                yaxis: { 
-                    title: { text: 'Watts' },
-                    decimalsInFloat: 0
-                }
+                yaxis: { title: { text: 'Watts' }, decimalsInFloat: 0 }
             };
 
-            // Destroy old instances if they exist (to allow updating)
+            if (socChartInstance) socChartInstance.destroy();
             if (voltChartInstance) voltChartInstance.destroy();
             if (loadChartInstance) loadChartInstance.destroy();
 
-            // Render New Charts
+            socChartInstance = new ApexCharts(document.querySelector("#socChart"), socOptions);
             voltChartInstance = new ApexCharts(document.querySelector("#voltageChart"), voltOptions);
             loadChartInstance = new ApexCharts(document.querySelector("#loadChart"), loadOptions);
 
+            socChartInstance.render();
             voltChartInstance.render();
             loadChartInstance.render();
         }
