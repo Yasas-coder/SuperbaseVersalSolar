@@ -43,14 +43,14 @@ with sync_playwright() as p:
 
 print(f"Scraped Data: Today={used_today}, Total={used_so_far}, MaxV={max_v}")
 
-# 3. Build AI Prompt
+# 3. Build AI Prompt (Updated to include SOC metrics)
 system_data_summary = f"""
 -- AC SYSTEM --
 - Used So Far: {used_so_far}
 - Projected Month End: {forecast}
 - Used Today: {used_today}
 
--- DC BATTERY SYSTEM --
+-- DC BATTERY SYSTEM (52Ah LiFePO4) --
 - Today's Peak Voltage: {max_v} ({max_v_time})
 - Today's Lowest Voltage: {min_v} ({min_v_time})
 """
@@ -65,7 +65,7 @@ CRITICAL INSTRUCTIONS:
 2. STRUCTURE ORDER: 
    - Paragraph 1: State the total "Used So Far" and the "Projected Month End" forecast.
    - Paragraph 2: State "Used Today".
-   - Paragraph 3: State the exact peak battery voltage, the exact time, Lowest Battery VOltage and the exact time it occurred.
+   - Paragraph 3: State the exact peak battery voltage, the exact time, Lowest Battery Voltage, and the exact time it occurred. Keep in mind this is a 52Ah LiFePO4 battery setup.
 3. TONE: DO NOT explain system architecture. DO NOT tell the user that the AC and DC systems are separate. Just present the numbers smoothly. No explanations, Just give data in sinhala and english
 
 Data to translate and analyze:
@@ -74,7 +74,7 @@ Data to translate and analyze:
 
 print("Generating Sinhala translation via Gemini...")
 response = client.models.generate_content(
-    model='gemini-3.5-flash-lite',
+    model='gemini-2.5-flash',
     contents=prompt,
 )
 ai_analysis = response.text
