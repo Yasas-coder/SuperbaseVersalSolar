@@ -33,7 +33,7 @@
             background-color: var(--bg);
             color: var(--text-main);
             margin: 0;
-            padding: 20px 15px 40px 15px;
+            padding: 20px 15px 60px 15px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -57,14 +57,39 @@
             transition: background-color 0.3s;
         }
 
-        .device-card {
+        /* --- PRIMARY CARD (FAN) --- */
+        .primary-card {
             background-color: var(--card-bg);
             width: 100%;
             max-width: 400px;
             border-radius: 24px;
-            padding: 22px;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+            padding: 24px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid #2a2a2a;
+        }
+
+        /* --- SECONDARY CARDS (LANTERN & SCHEDULES) --- */
+        .section-title {
+            width: 100%;
+            max-width: 400px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            padding-left: 10px;
+        }
+
+        .secondary-card {
+            background-color: #181818;
+            width: 100%;
+            max-width: 400px;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border: 1px solid #222;
         }
 
         .device-header {
@@ -77,6 +102,7 @@
         .device-title { display: flex; align-items: center; gap: 12px; }
         .device-title span { font-size: 28px; }
         .device-title h2 { margin: 0; font-size: 20px; font-weight: 600; }
+        .secondary-card .device-title h2 { font-size: 17px; }
         
         .state-badge {
             font-size: 11px; font-weight: 800; padding: 6px 12px;
@@ -102,44 +128,43 @@
         .btn-off { background-color: var(--accent-off); font-weight: 800; }
         .btn-auto { background-color: var(--accent-auto); color: #000; font-weight: 800; }
 
-        /* --- SECTION DIVIDERS --- */
-        .section-divider {
-            margin-top: 16px;
-            padding-top: 16px;
+        /* --- TIMERS (PROMINENT) --- */
+        .timer-section {
+            margin-top: 20px;
+            padding-top: 20px;
             border-top: 1px solid #2e2e2e;
         }
 
-        .section-label {
+        .timer-label {
             font-size: 12px;
             font-weight: 700;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.8px;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
             display: flex;
             align-items: center;
             gap: 6px;
         }
 
-        /* --- TIMERS --- */
         .preset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 15px; }
         
         .preset-btn {
             background-color: var(--sub-card); border: 1px solid #383838;
-            border-radius: 12px; padding: 10px 0; font-size: 13px; font-weight: 700; color: #ddd;
+            border-radius: 12px; padding: 12px 0; font-size: 14px; font-weight: 700; color: #ddd;
         }
         .preset-btn:active { background-color: var(--accent-timer); color: #fff; }
 
-        .slider-container { background: var(--sub-card); border: 1px solid #383838; border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; }
-        .slider-header { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; margin-bottom: 12px; color: #ccc; }
-        .slider-display { color: var(--accent-timer); font-size: 14px; }
-        .slider-row { display: flex; align-items: center; gap: 12px; }
+        .slider-container { background: var(--sub-card); border: 1px solid #383838; border-radius: 14px; padding: 15px; margin-bottom: 12px; }
+        .slider-header { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; margin-bottom: 15px; color: #ccc; }
+        .slider-display { color: var(--accent-timer); font-size: 15px; }
+        .slider-row { display: flex; align-items: center; gap: 15px; }
 
         input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; flex: 1; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 22px; width: 22px; border-radius: 50%; background: var(--accent-timer); cursor: pointer; margin-top: -8px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: var(--accent-timer); cursor: pointer; margin-top: -9px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
         input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #444; border-radius: 4px; }
 
-        .btn-set-action { border-radius: 10px; padding: 8px 16px; font-size: 13px; font-weight: 700; flex-shrink: 0; margin: 0; }
+        .btn-set-action { border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 700; flex-shrink: 0; margin: 0; }
         .btn-timer-action { background-color: var(--accent-timer); }
         .btn-schedule-action { background-color: var(--accent-auto); color: #000; }
 
@@ -147,10 +172,10 @@
         
         .custom-input {
             flex: 1; background: var(--sub-card); border: 1px solid #383838;
-            border-radius: 12px; color: #fff; padding: 10px 14px; font-size: 14px; font-weight: 600; outline: none;
+            border-radius: 12px; color: #fff; padding: 12px 14px; font-size: 15px; font-weight: 600; outline: none;
         }
         .custom-input:focus { border-color: var(--accent-timer); }
-        .custom-input.schedule-input { text-align: center; padding: 10px; }
+        .custom-input.schedule-input { text-align: center; padding: 12px; font-size: 14px; }
         .custom-input.schedule-input:focus { border-color: var(--accent-auto); }
 
     </style>
@@ -162,26 +187,26 @@
         <div id="conn-dot" class="status-dot"></div>
     </div>
 
-    <!-- PRIMARY: FAN (Relay 3 -> Index 2) -->
-    <div class="device-card">
+    <!-- ==========================================
+         TOP: PROMINENT FAN CONTROLS 
+         ========================================== -->
+    <div class="primary-card">
         <div class="device-header">
             <div class="device-title">
                 <span>🌀</span>
-                <h2>Room Fan</h2>
+                <h2 style="font-size: 24px;">Room Fan</h2>
             </div>
-            <div id="badge-fan" class="state-badge">SYNCING...</div>
+            <div id="badge-fan" class="state-badge" style="font-size: 12px;">SYNCING...</div>
         </div>
         
-        <!-- Main Power Buttons (Now includes AUTO) -->
         <div class="controls three-col">
             <button class="btn-on" onclick="sendCommand(2, 'ON')">ON</button>
             <button class="btn-off" onclick="sendCommand(2, 'OFF')">OFF</button>
             <button class="btn-auto" onclick="sendCommand(2, 'AUTOTIME')">AUTO</button>
         </div>
 
-        <!-- Interactive Fan Timers -->
-        <div class="section-divider">
-            <div class="section-label">⏱️ Timers</div>
+        <div class="timer-section">
+            <div class="timer-label">⏱️ Timers</div>
             
             <div class="preset-grid">
                 <button class="preset-btn" onclick="startCustomTimer(2, 15)">15m</button>
@@ -192,7 +217,7 @@
             
             <div class="slider-container">
                 <div class="slider-header">
-                    <span>Drag to set timer:</span>
+                    <span>Drag to set:</span>
                     <span id="fan-slider-val" class="slider-display">45 mins</span>
                 </div>
                 <div class="slider-row">
@@ -203,23 +228,28 @@
 
             <div class="flex-row">
                 <input type="number" id="custom-fan-min" class="custom-input" placeholder="Custom mins..." min="1" max="1440">
-                <button class="btn-set-action btn-timer-action" style="padding: 10px 16px; border-radius: 12px;" onclick="startInputTimer(2, 'custom-fan-min')">Start</button>
-            </div>
-        </div>
-
-        <!-- Auto Schedule Configuration -->
-        <div class="section-divider">
-            <div class="section-label">⏰ Auto Schedule (0-23h)</div>
-            <div class="flex-row">
-                <input type="number" id="fan-on-h" class="custom-input schedule-input" placeholder="ON Hr" min="0" max="23">
-                <input type="number" id="fan-off-h" class="custom-input schedule-input" placeholder="OFF Hr" min="0" max="23">
-                <button class="btn-set-action btn-schedule-action" style="padding: 10px 16px; border-radius: 12px;" onclick="saveAppSchedule(2, 'fan-on-h', 'fan-off-h')">Save</button>
+                <button class="btn-set-action btn-timer-action" style="border-radius: 12px;" onclick="startInputTimer(2, 'custom-fan-min')">Start</button>
             </div>
         </div>
     </div>
 
-    <!-- SECONDARY: VESAK LANTERN (Relay 2 -> Index 1) -->
-    <div class="device-card">
+    <!-- ==========================================
+         BOTTOM: ADVANCED & SECONDARY CONTROLS
+         ========================================== -->
+    <div class="section-title">Advanced & Secondary</div>
+
+    <!-- Fan Schedule Settings (Pushed Down) -->
+    <div class="secondary-card">
+        <div class="timer-label" style="margin-bottom: 12px;">🌀 Fan Auto Schedule (0-23h)</div>
+        <div class="flex-row">
+            <input type="number" id="fan-on-h" class="custom-input schedule-input" placeholder="ON Hr" min="0" max="23">
+            <input type="number" id="fan-off-h" class="custom-input schedule-input" placeholder="OFF Hr" min="0" max="23">
+            <button class="btn-set-action btn-schedule-action" style="border-radius: 12px;" onclick="saveAppSchedule(2, 'fan-on-h', 'fan-off-h')">Save</button>
+        </div>
+    </div>
+
+    <!-- Vesak Lantern (Pushed Down) -->
+    <div class="secondary-card">
         <div class="device-header">
             <div class="device-title">
                 <span>🏮</span>
@@ -227,20 +257,18 @@
             </div>
             <div id="badge-lantern" class="state-badge">SYNCING...</div>
         </div>
-        <div class="controls three-col">
+        
+        <div class="controls three-col" style="margin-bottom: 15px;">
             <button class="btn-on" onclick="sendCommand(1, 'ON')">ON</button>
             <button class="btn-off" onclick="sendCommand(1, 'OFF')">OFF</button>
             <button class="btn-auto" onclick="sendCommand(1, 'AUTOTIME')">AUTO</button>
         </div>
 
-        <!-- Lantern Auto Schedule Configuration -->
-        <div class="section-divider">
-            <div class="section-label">⏰ Auto Schedule (0-23h)</div>
-            <div class="flex-row">
-                <input type="number" id="lantern-on-h" class="custom-input schedule-input" placeholder="ON Hr" min="0" max="23">
-                <input type="number" id="lantern-off-h" class="custom-input schedule-input" placeholder="OFF Hr" min="0" max="23">
-                <button class="btn-set-action btn-schedule-action" style="padding: 10px 16px; border-radius: 12px;" onclick="saveAppSchedule(1, 'lantern-on-h', 'lantern-off-h')">Save</button>
-            </div>
+        <div class="timer-label" style="margin-bottom: 12px; border-top: 1px solid #2e2e2e; padding-top: 15px;">⏰ Lantern Schedule (0-23h)</div>
+        <div class="flex-row">
+            <input type="number" id="lantern-on-h" class="custom-input schedule-input" placeholder="ON Hr" min="0" max="23">
+            <input type="number" id="lantern-off-h" class="custom-input schedule-input" placeholder="OFF Hr" min="0" max="23">
+            <button class="btn-set-action btn-schedule-action" style="border-radius: 12px;" onclick="saveAppSchedule(1, 'lantern-on-h', 'lantern-off-h')">Save</button>
         </div>
     </div>
 
@@ -380,7 +408,7 @@
             if (onVal !== "") payloadObj.on_h = parseInt(onVal);
             if (offVal !== "") payloadObj.off_h = parseInt(offVal);
 
-            if (Object.keys(payloadObj).length === 1) {
+            if (Object.keys(payloadObj).length === 0) {
                 alert("Please enter at least one hour (0-23) to save.");
                 return;
             }
