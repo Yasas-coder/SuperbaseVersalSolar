@@ -102,14 +102,14 @@
         .btn-off { background-color: var(--accent-off); font-weight: 800; }
         .btn-auto { background-color: var(--accent-auto); color: #000; font-weight: 800; }
 
-        /* --- TIMER TRAY SECTION --- */
-        .timer-section {
+        /* --- SECTION DIVIDERS --- */
+        .section-divider {
             margin-top: 16px;
             padding-top: 16px;
             border-top: 1px solid #2e2e2e;
         }
 
-        .timer-label {
+        .section-label {
             font-size: 12px;
             font-weight: 700;
             color: var(--text-muted);
@@ -121,113 +121,38 @@
             gap: 6px;
         }
 
-        .preset-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            margin-bottom: 15px;
-        }
-
+        /* --- TIMERS --- */
+        .preset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 15px; }
+        
         .preset-btn {
-            background-color: var(--sub-card);
-            border: 1px solid #383838;
-            border-radius: 12px;
-            padding: 10px 0;
-            font-size: 13px;
-            font-weight: 700;
-            color: #ddd;
+            background-color: var(--sub-card); border: 1px solid #383838;
+            border-radius: 12px; padding: 10px 0; font-size: 13px; font-weight: 700; color: #ddd;
         }
+        .preset-btn:active { background-color: var(--accent-timer); color: #fff; }
 
-        .preset-btn:active {
-            background-color: var(--accent-timer);
-            color: #fff;
-        }
+        .slider-container { background: var(--sub-card); border: 1px solid #383838; border-radius: 14px; padding: 12px 14px; margin-bottom: 12px; }
+        .slider-header { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; margin-bottom: 12px; color: #ccc; }
+        .slider-display { color: var(--accent-timer); font-size: 14px; }
+        .slider-row { display: flex; align-items: center; gap: 12px; }
 
-        /* --- SLIDER UI --- */
-        .slider-container {
-            background: var(--sub-card);
-            border: 1px solid #383838;
-            border-radius: 14px;
-            padding: 12px 14px;
-            margin-bottom: 12px;
-        }
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; flex: 1; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 22px; width: 22px; border-radius: 50%; background: var(--accent-timer); cursor: pointer; margin-top: -8px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #444; border-radius: 4px; }
 
-        .slider-header {
-            display: flex;
-            justify-content: space-between;
-            font-size: 13px;
-            font-weight: 700;
-            margin-bottom: 12px;
-            color: #ccc;
-        }
+        .btn-set-action { border-radius: 10px; padding: 8px 16px; font-size: 13px; font-weight: 700; flex-shrink: 0; margin: 0; }
+        .btn-timer-action { background-color: var(--accent-timer); }
+        .btn-schedule-action { background-color: var(--accent-auto); color: #000; }
 
-        .slider-display {
-            color: var(--accent-timer);
-            font-size: 14px;
+        .flex-row { display: flex; gap: 8px; }
+        
+        .custom-input {
+            flex: 1; background: var(--sub-card); border: 1px solid #383838;
+            border-radius: 12px; color: #fff; padding: 10px 14px; font-size: 14px; font-weight: 600; outline: none;
         }
+        .custom-input:focus { border-color: var(--accent-timer); }
+        .custom-input.schedule-input { text-align: center; padding: 10px; }
+        .custom-input.schedule-input:focus { border-color: var(--accent-auto); }
 
-        .slider-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        input[type=range] {
-            -webkit-appearance: none;
-            width: 100%;
-            background: transparent;
-            flex: 1;
-        }
-
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 22px;
-            width: 22px;
-            border-radius: 50%;
-            background: var(--accent-timer);
-            cursor: pointer;
-            margin-top: -8px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
-        }
-
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 6px;
-            cursor: pointer;
-            background: #444;
-            border-radius: 4px;
-        }
-
-        .btn-set-timer {
-            background-color: var(--accent-timer);
-            border-radius: 10px;
-            padding: 8px 16px;
-            font-size: 13px;
-            font-weight: 700;
-            flex-shrink: 0;
-            margin: 0;
-        }
-
-        .custom-timer-row {
-            display: flex;
-            gap: 8px;
-        }
-
-        .custom-timer-input {
-            flex: 1;
-            background: var(--sub-card);
-            border: 1px solid #383838;
-            border-radius: 12px;
-            color: #fff;
-            padding: 10px 14px;
-            font-size: 14px;
-            font-weight: 600;
-            outline: none;
-        }
-
-        .custom-timer-input:focus {
-            border-color: var(--accent-timer);
-        }
     </style>
 </head>
 <body>
@@ -247,17 +172,17 @@
             <div id="badge-fan" class="state-badge">SYNCING...</div>
         </div>
         
-        <!-- Main Power Buttons -->
-        <div class="controls">
-            <button class="btn-on" onclick="sendCommand(2, 'ON')">Turn ON</button>
-            <button class="btn-off" onclick="sendCommand(2, 'OFF')">Turn OFF</button>
+        <!-- Main Power Buttons (Now includes AUTO) -->
+        <div class="controls three-col">
+            <button class="btn-on" onclick="sendCommand(2, 'ON')">ON</button>
+            <button class="btn-off" onclick="sendCommand(2, 'OFF')">OFF</button>
+            <button class="btn-auto" onclick="sendCommand(2, 'AUTOTIME')">AUTO</button>
         </div>
 
         <!-- Interactive Fan Timers -->
-        <div class="timer-section">
-            <div class="timer-label">⏱️ Quick Timers</div>
+        <div class="section-divider">
+            <div class="section-label">⏱️ Timers</div>
             
-            <!-- Quick Presets -->
             <div class="preset-grid">
                 <button class="preset-btn" onclick="startCustomTimer(2, 15)">15m</button>
                 <button class="preset-btn" onclick="startCustomTimer(2, 30)">30m</button>
@@ -265,7 +190,6 @@
                 <button class="preset-btn" onclick="startCustomTimer(2, 120)">2h</button>
             </div>
             
-            <!-- Slider Control (Max 240 mins) -->
             <div class="slider-container">
                 <div class="slider-header">
                     <span>Drag to set timer:</span>
@@ -273,14 +197,23 @@
                 </div>
                 <div class="slider-row">
                     <input type="range" id="fan-slider" min="1" max="240" value="45" oninput="updateSliderText(this.value)">
-                    <button class="btn-set-timer" onclick="startCustomTimer(2, document.getElementById('fan-slider').value)">Start</button>
+                    <button class="btn-set-action btn-timer-action" onclick="startCustomTimer(2, document.getElementById('fan-slider').value)">Start</button>
                 </div>
             </div>
 
-            <!-- Custom Minutes Input -->
-            <div class="custom-timer-row">
-                <input type="number" id="custom-fan-min" class="custom-timer-input" placeholder="Type custom mins..." min="1" max="1440">
-                <button class="btn-set-timer" style="padding: 10px 16px; border-radius: 12px;" onclick="startInputTimer(2, 'custom-fan-min')">Start</button>
+            <div class="flex-row">
+                <input type="number" id="custom-fan-min" class="custom-input" placeholder="Custom mins..." min="1" max="1440">
+                <button class="btn-set-action btn-timer-action" style="padding: 10px 16px; border-radius: 12px;" onclick="startInputTimer(2, 'custom-fan-min')">Start</button>
+            </div>
+        </div>
+
+        <!-- Auto Schedule Configuration -->
+        <div class="section-divider">
+            <div class="section-label">⏰ Auto Schedule (0-23h)</div>
+            <div class="flex-row">
+                <input type="number" id="fan-on-h" class="custom-input schedule-input" placeholder="ON Hr" min="0" max="23">
+                <input type="number" id="fan-off-h" class="custom-input schedule-input" placeholder="OFF Hr" min="0" max="23">
+                <button class="btn-set-action btn-schedule-action" style="padding: 10px 16px; border-radius: 12px;" onclick="saveAppSchedule(2, 'fan-on-h', 'fan-off-h')">Save</button>
             </div>
         </div>
     </div>
@@ -298,6 +231,16 @@
             <button class="btn-on" onclick="sendCommand(1, 'ON')">ON</button>
             <button class="btn-off" onclick="sendCommand(1, 'OFF')">OFF</button>
             <button class="btn-auto" onclick="sendCommand(1, 'AUTOTIME')">AUTO</button>
+        </div>
+
+        <!-- Lantern Auto Schedule Configuration -->
+        <div class="section-divider">
+            <div class="section-label">⏰ Auto Schedule (0-23h)</div>
+            <div class="flex-row">
+                <input type="number" id="lantern-on-h" class="custom-input schedule-input" placeholder="ON Hr" min="0" max="23">
+                <input type="number" id="lantern-off-h" class="custom-input schedule-input" placeholder="OFF Hr" min="0" max="23">
+                <button class="btn-set-action btn-schedule-action" style="padding: 10px 16px; border-radius: 12px;" onclick="saveAppSchedule(1, 'lantern-on-h', 'lantern-off-h')">Save</button>
+            </div>
         </div>
     </div>
 
@@ -393,18 +336,15 @@
                 return;
             }
 
-            // 1. Update the timer duration in the ESP32 configuration
             const schedPayload = JSON.stringify({ idx: relayIndex, timer_m: parseInt(minutes) });
             const schedMsg = new Paho.MQTT.Message(schedPayload);
             schedMsg.destinationName = "mysolar_lk99/schedule/set";
             client.send(schedMsg);
 
-            // 2. Trigger TIMER mode immediately
             const timerMsg = new Paho.MQTT.Message("TIMER");
             timerMsg.destinationName = `mysolar_lk99/relay/${relayIndex}`;
             client.send(timerMsg);
 
-            // Instant UI feedback
             const badge = relayIndex === 2 ? badgeFan : badgeLantern;
             let hours = Math.floor(minutes / 60);
             let mins = minutes % 60;
@@ -424,6 +364,41 @@
             }
             startCustomTimer(relayIndex, mins);
             input.value = "";
+        }
+
+        // --- AUTO SCHEDULE DISPATCHER ---
+        function saveAppSchedule(relayIndex, onId, offId) {
+            if (!client.isConnected()) {
+                alert("App is offline. Waiting to reconnect...");
+                return;
+            }
+
+            const payloadObj = { idx: relayIndex };
+            const onVal = document.getElementById(onId).value;
+            const offVal = document.getElementById(offId).value;
+
+            if (onVal !== "") payloadObj.on_h = parseInt(onVal);
+            if (offVal !== "") payloadObj.off_h = parseInt(offVal);
+
+            if (Object.keys(payloadObj).length === 1) {
+                alert("Please enter at least one hour (0-23) to save.");
+                return;
+            }
+
+            const schedPayload = JSON.stringify(payloadObj);
+            const schedMsg = new Paho.MQTT.Message(schedPayload);
+            schedMsg.destinationName = "mysolar_lk99/schedule/set";
+            client.send(schedMsg);
+
+            // Clear inputs after sending
+            document.getElementById(onId).value = "";
+            document.getElementById(offId).value = "";
+
+            // Give instant UI feedback
+            const badge = relayIndex === 2 ? badgeFan : badgeLantern;
+            badge.innerText = "⏰ SCHED SET";
+            badge.style.color = "var(--accent-auto)";
+            badge.style.borderColor = "var(--accent-auto)";
         }
     </script>
 </body>
