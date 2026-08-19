@@ -119,9 +119,16 @@
 
         window.onload = () => {
             const now = new Date();
-            const yesterday = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-            document.getElementById('start-date').value = yesterday.toISOString().slice(0,16);
-            document.getElementById('end-date').value = now.toISOString().slice(0,16);
+            // Get the local timezone offset in milliseconds
+            const tzOffset = now.getTimezoneOffset() * 60000; 
+            
+            // Apply the offset to get local time strings
+            const localNow = new Date(now.getTime() - tzOffset);
+            const localYesterday = new Date(localNow.getTime() - (24 * 60 * 60 * 1000));
+            
+            document.getElementById('start-date').value = localYesterday.toISOString().slice(0,16);
+            document.getElementById('end-date').value = localNow.toISOString().slice(0,16);
+            
             fetchAndRenderData();
         };
 
