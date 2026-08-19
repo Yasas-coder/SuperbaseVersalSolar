@@ -17,12 +17,13 @@
         :root {
             --bg: #121212;
             --card-bg: #1e1e1e;
+            --sub-card: #282828;
             --text-main: #ffffff;
             --text-muted: #888888;
             --accent-on: #00e676;
             --accent-off: #ff2e63;
             --accent-auto: #00adb5;
-            --accent-timer: #7b1fa2;
+            --accent-timer: #9c27b0;
         }
         
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -32,7 +33,7 @@
             background-color: var(--bg);
             color: var(--text-main);
             margin: 0;
-            padding: 20px 15px;
+            padding: 20px 15px 40px 15px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -44,14 +45,14 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
+            margin-bottom: 25px;
         }
         
         .header h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 0.5px; }
         
         .status-dot {
             width: 12px; height: 12px; border-radius: 50%;
-            background-color: #ff9f43; /* Starts orange (connecting) */
+            background-color: #ff9f43;
             box-shadow: 0 0 8px rgba(255, 159, 67, 0.6);
             transition: background-color 0.3s;
         }
@@ -60,17 +61,17 @@
             background-color: var(--card-bg);
             width: 100%;
             max-width: 400px;
-            border-radius: 20px;
-            padding: 24px;
+            border-radius: 24px;
+            padding: 22px;
             margin-bottom: 20px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
         }
 
         .device-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
         .device-title { display: flex; align-items: center; gap: 12px; }
@@ -78,35 +79,106 @@
         .device-title h2 { margin: 0; font-size: 20px; font-weight: 600; }
         
         .state-badge {
-            font-size: 12px; font-weight: 800; padding: 6px 12px;
-            border-radius: 20px; background: #333; color: var(--text-muted);
+            font-size: 11px; font-weight: 800; padding: 6px 12px;
+            border-radius: 20px; background: #2a2a2a; color: var(--text-muted);
             text-transform: uppercase; letter-spacing: 1px;
+            border: 1px solid #333;
         }
 
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .controls.three-col { grid-template-columns: 1fr 1fr 1fr; }
 
         button {
-            border: none; border-radius: 14px; padding: 16px 0;
+            border: none; border-radius: 14px; padding: 15px 0;
             font-size: 15px; font-weight: 700; color: white;
             cursor: pointer; transition: transform 0.1s, filter 0.2s;
-            background: #333; /* Default */
+            background: #333;
         }
         
         button:active { transform: scale(0.96); }
         button:hover { filter: brightness(1.1); }
         
-        .btn-on { background-color: var(--accent-on); color: #000; }
-        .btn-off { background-color: var(--accent-off); }
-        .btn-timer { background-color: var(--accent-timer); grid-column: span 2; }
-        .btn-auto { background-color: var(--accent-auto); }
+        .btn-on { background-color: var(--accent-on); color: #000; font-weight: 800; }
+        .btn-off { background-color: var(--accent-off); font-weight: 800; }
+        .btn-auto { background-color: var(--accent-auto); color: #000; font-weight: 800; }
 
+        /* --- TIMER TRAY SECTION --- */
+        .timer-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #2e2e2e;
+        }
+
+        .timer-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .preset-btn {
+            background-color: var(--sub-card);
+            border: 1px solid #383838;
+            border-radius: 12px;
+            padding: 10px 0;
+            font-size: 13px;
+            font-weight: 700;
+            color: #ddd;
+        }
+
+        .preset-btn:active {
+            background-color: var(--accent-timer);
+            color: #fff;
+        }
+
+        .custom-timer-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .custom-timer-input {
+            flex: 1;
+            background: var(--sub-card);
+            border: 1px solid #383838;
+            border-radius: 12px;
+            color: #fff;
+            padding: 10px 14px;
+            font-size: 14px;
+            font-weight: 600;
+            outline: none;
+        }
+
+        .custom-timer-input:focus {
+            border-color: var(--accent-timer);
+        }
+
+        .btn-set-timer {
+            background-color: var(--accent-timer);
+            border-radius: 12px;
+            padding: 0 16px;
+            font-size: 13px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <h1>Smart Home</h1>
+        <h1>Smart Control</h1>
         <div id="conn-dot" class="status-dot"></div>
     </div>
 
@@ -119,10 +191,28 @@
             </div>
             <div id="badge-fan" class="state-badge">SYNCING...</div>
         </div>
+        
+        <!-- Main Power Buttons -->
         <div class="controls">
             <button class="btn-on" onclick="sendCommand(2, 'ON')">Turn ON</button>
             <button class="btn-off" onclick="sendCommand(2, 'OFF')">Turn OFF</button>
-            <button class="btn-timer" onclick="sendCommand(2, 'TIMER')">⏱️ 30 Min Timer</button>
+        </div>
+
+        <!-- Interactive Fan Timers -->
+        <div class="timer-section">
+            <div class="timer-label">⏱️ Quick Timers</div>
+            <div class="preset-grid">
+                <button class="preset-btn" onclick="startCustomTimer(2, 15)">15m</button>
+                <button class="preset-btn" onclick="startCustomTimer(2, 30)">30m</button>
+                <button class="preset-btn" onclick="startCustomTimer(2, 60)">1h</button>
+                <button class="preset-btn" onclick="startCustomTimer(2, 120)">2h</button>
+            </div>
+            
+            <!-- Custom Minutes Input -->
+            <div class="custom-timer-row">
+                <input type="number" id="custom-fan-min" class="custom-timer-input" placeholder="Custom mins (e.g. 45)" min="1" max="720">
+                <button class="btn-set-timer" onclick="startInputTimer(2, 'custom-fan-min')">Start</button>
+            </div>
         </div>
     </div>
 
@@ -177,20 +267,15 @@
         }
 
         function updateBadge(badgeElement, state, mode) {
-            const modes = ["OFF OVERRIDE", "ON OVERRIDE", "AUTO SCHEDULE", "AUTO VOLT", "TIMER ACTIVE"];
+            const modes = ["OFF", "ON", "AUTO SCHEDULE", "AUTO VOLT", "TIMER ACTIVE"];
             let modeText = modes[mode] || "UNKNOWN";
             
-            badgeElement.innerText = state ? "🟢 ON" : "⚪ OFF";
-            
-            // Add a sub-text for mode if it's not standard on/off
-            if (mode === 2 || mode === 4) {
-                badgeElement.innerText += ` (${modeText.split(' ')[0]})`;
-            }
-
             if (state) {
-                badgeElement.style.color = "var(--accent-on)";
-                badgeElement.style.borderColor = "var(--accent-on)";
+                badgeElement.innerText = mode === 4 ? "⏱️ TIMER ON" : (mode === 2 ? "⏰ AUTO ON" : "🟢 ON");
+                badgeElement.style.color = mode === 4 ? "var(--accent-timer)" : "var(--accent-on)";
+                badgeElement.style.borderColor = mode === 4 ? "var(--accent-timer)" : "var(--accent-on)";
             } else {
+                badgeElement.innerText = "⚪ OFF";
                 badgeElement.style.color = "var(--text-muted)";
                 badgeElement.style.borderColor = "#333";
             }
@@ -201,7 +286,6 @@
                 try {
                     const status = JSON.parse(message.payloadString);
                     if (status.relays) {
-                        // Relay Array Indexes: 0=CEB, 1=Vesak, 2=Fan, 3=House
                         const lanternData = status.relays.find(r => r.id === 1);
                         const fanData = status.relays.find(r => r.id === 2);
                         
@@ -218,13 +302,48 @@
                 msg.destinationName = `mysolar_lk99/relay/${relayIndex}`;
                 client.send(msg);
                 
-                // Optimistic UI update (gives instant feedback before ESP32 confirms)
                 const badge = relayIndex === 2 ? badgeFan : badgeLantern;
                 badge.innerText = "SENDING...";
                 badge.style.color = "#ff9f43";
             } else {
                 alert("App is offline. Waiting to reconnect...");
             }
+        }
+
+        // --- DYNAMIC TIMER DISPATCHER ---
+        function startCustomTimer(relayIndex, minutes) {
+            if (!client.isConnected()) {
+                alert("App is offline. Waiting to reconnect...");
+                return;
+            }
+
+            // 1. Update the timer duration in the ESP32 configuration
+            const schedPayload = JSON.stringify({ idx: relayIndex, timer_m: parseInt(minutes) });
+            const schedMsg = new Paho.MQTT.Message(schedPayload);
+            schedMsg.destinationName = "mysolar_lk99/schedule/set";
+            client.send(schedMsg);
+
+            // 2. Trigger TIMER mode immediately
+            const timerMsg = new Paho.MQTT.Message("TIMER");
+            timerMsg.destinationName = `mysolar_lk99/relay/${relayIndex}`;
+            client.send(timerMsg);
+
+            // Instant UI feedback
+            const badge = relayIndex === 2 ? badgeFan : badgeLantern;
+            badge.innerText = `⏱️ ${minutes}M STARTED`;
+            badge.style.color = "var(--accent-timer)";
+            badge.style.borderColor = "var(--accent-timer)";
+        }
+
+        function startInputTimer(relayIndex, inputId) {
+            const input = document.getElementById(inputId);
+            const mins = parseInt(input.value);
+            if (!mins || mins <= 0) {
+                alert("Please enter a valid number of minutes (e.g. 45)");
+                return;
+            }
+            startCustomTimer(relayIndex, mins);
+            input.value = "";
         }
     </script>
 </body>
