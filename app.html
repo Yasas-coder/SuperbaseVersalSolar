@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Native App Meta Tags -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#121212">
+    
+    <title>Smart Control</title>
+    
+    <!-- Paho MQTT Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+    
+    <style>
+        :root {
+            --bg: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #ffffff;
+            --text-muted: #888888;
+            --accent-on: #00e676;
+            --accent-off: #ff2e63;
+            --accent-auto: #00adb5;
+            --accent-timer: #7b1fa2;
+        }
+        
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 0.5px; }
+        
+        .status-dot {
+            width: 12px; height: 12px; border-radius: 50%;
+            background-color: #ff9f43; /* Starts orange (connecting) */
+            box-shadow: 0 0 8px rgba(255, 159, 67, 0.6);
+            transition: background-color 0.3s;
+        }
+
+        .device-card {
+            background-color: var(--card-bg);
+            width: 100%;
+            max-width: 400px;
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+
+        .device-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .device-title { display: flex; align-items: center; gap: 12px; }
+        .device-title span { font-size: 28px; }
+        .device-title h2 { margin: 0; font-size: 20px; font-weight: 600; }
+        
+        .state-badge {
+            font-size: 12px; font-weight: 800; padding: 6px 12px;
+            border-radius: 20px; background: #333; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .controls.three-col { grid-template-columns: 1fr 1fr 1fr; }
+
+        button {
+            border: none; border-radius: 14px; padding: 16px 0;
+            font-size: 15px; font-weight: 700; color: white;
+            cursor: pointer; transition: transform 0.1s, filter 0.2s;
+            background: #333; /* Default */
+        }
+        
+        button:active { transform: scale(0.96); }
+        button:hover { filter: brightness(1.1); }
+        
+        .btn-on { background-color: var(--accent-on); color: #000; }
+        .btn-off { background-color: var(--accent-off); }
+        .btn-timer { background-color: var(--accent-timer); grid-column: span 2; }
+        .btn-auto { background-color: var(--accent-auto); }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Smart Home</h1>
+        <div id="conn-dot" class="status-dot"></div>
+    </div>
+
+    <!-- PRIMARY: FAN (Relay 3 -> Index 2) -->
+    <div class="device-card">
+        <div class="device-header">
+            <div class="device-title">
+                <span>🌀</span>
+                <h2>Room Fan</h2>
+            </div>
+            <div id="badge-fan" class="state-badge">SYNCING...</div>
+        </div>
+        <div class="controls">
+            <button class="btn-on" onclick="sendCommand(2, 'ON')">Turn ON</button>
+            <button class="btn-off" onclick="sendCommand(2, 'OFF')">Turn OFF</button>
+            <button class="btn-timer" onclick="sendCommand(2, 'TIMER')">⏱️ 30 Min Timer</button>
+        </div>
+    </div>
+
+    <!-- SECONDARY: VESAK LANTERN (Relay 2 -> Index 1) -->
+    <div class="device-card">
+        <div class="device-header">
+            <div class="device-title">
+                <span>🏮</span>
+                <h2>Vesak Lantern</h2>
+            </div>
+            <div id="badge-lantern" class="state-badge">SYNCING...</div>
+        </div>
+        <div class="controls three-col">
+            <button class="btn-on" onclick="sendCommand(1, 'ON')">ON</button>
+            <button class="btn-off" onclick="sendCommand(1, 'OFF')">OFF</button>
+            <button class="btn-auto" onclick="sendCommand(1, 'AUTOTIME')">AUTO</button>
+        </div>
+    </div>
+
+    <script>
+        // --- MQTT SETUP ---
+        const mqttBroker = "broker.hivemq.com";
+        const mqttPort = 8884;
+        const clientID = "MobileApp-" + Math.floor(Math.random() * 10000);
+        const client = new Paho.MQTT.Client(mqttBroker, mqttPort, clientID);
+
+        const connDot = document.getElementById("conn-dot");
+        const badgeFan = document.getElementById("badge-fan");
+        const badgeLantern = document.getElementById("badge-lantern");
+
+        client.onConnectionLost = onConnectionLost;
+        client.onMessageArrived = onMessageArrived;
+        client.connect({ onSuccess: onConnect, onFailure: onFailure, useSSL: true });
+
+        function onConnect() {
+            connDot.style.backgroundColor = "var(--accent-on)";
+            connDot.style.boxShadow = "0 0 10px var(--accent-on)";
+            client.subscribe("mysolar_lk99/status");
+        }
+
+        function onFailure(response) {
+            connDot.style.backgroundColor = "var(--accent-off)";
+            connDot.style.boxShadow = "0 0 10px var(--accent-off)";
+        }
+
+        function onConnectionLost(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                connDot.style.backgroundColor = "#ff9f43";
+                connDot.style.boxShadow = "0 0 10px #ff9f43";
+                setTimeout(() => client.connect({ onSuccess: onConnect, onFailure: onFailure, useSSL: true }), 5000);
+            }
+        }
+
+        function updateBadge(badgeElement, state, mode) {
+            const modes = ["OFF OVERRIDE", "ON OVERRIDE", "AUTO SCHEDULE", "AUTO VOLT", "TIMER ACTIVE"];
+            let modeText = modes[mode] || "UNKNOWN";
+            
+            badgeElement.innerText = state ? "🟢 ON" : "⚪ OFF";
+            
+            // Add a sub-text for mode if it's not standard on/off
+            if (mode === 2 || mode === 4) {
+                badgeElement.innerText += ` (${modeText.split(' ')[0]})`;
+            }
+
+            if (state) {
+                badgeElement.style.color = "var(--accent-on)";
+                badgeElement.style.borderColor = "var(--accent-on)";
+            } else {
+                badgeElement.style.color = "var(--text-muted)";
+                badgeElement.style.borderColor = "#333";
+            }
+        }
+
+        function onMessageArrived(message) {
+            if (message.destinationName === "mysolar_lk99/status") {
+                try {
+                    const status = JSON.parse(message.payloadString);
+                    if (status.relays) {
+                        // Relay Array Indexes: 0=CEB, 1=Vesak, 2=Fan, 3=House
+                        const lanternData = status.relays.find(r => r.id === 1);
+                        const fanData = status.relays.find(r => r.id === 2);
+                        
+                        if (lanternData) updateBadge(badgeLantern, lanternData.state, lanternData.mode);
+                        if (fanData) updateBadge(badgeFan, fanData.state, fanData.mode);
+                    }
+                } catch (e) { console.error("Failed to parse status:", e); }
+            }
+        }
+
+        function sendCommand(relayIndex, command) {
+            if (client.isConnected()) {
+                const msg = new Paho.MQTT.Message(command);
+                msg.destinationName = `mysolar_lk99/relay/${relayIndex}`;
+                client.send(msg);
+                
+                // Optimistic UI update (gives instant feedback before ESP32 confirms)
+                const badge = relayIndex === 2 ? badgeFan : badgeLantern;
+                badge.innerText = "SENDING...";
+                badge.style.color = "#ff9f43";
+            } else {
+                alert("App is offline. Waiting to reconnect...");
+            }
+        }
+    </script>
+</body>
+</html>
