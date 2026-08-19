@@ -104,6 +104,7 @@
     <!-- Chart Divs -->
     <div class="chart-container"><div id="socChart"></div></div>
     <div class="chart-container"><div id="voltageChart"></div></div>
+    <div class="chart-container"><div id="currentChart"></div></div> <!-- NEW CURRENT CHART -->
     <div class="chart-container"><div id="loadChart"></div></div>
 
     <script>
@@ -113,6 +114,7 @@
         
         let socChartInstance = null;
         let voltChartInstance = null;
+        let currentChartInstance = null; // New instance
         let loadChartInstance = null;
 
         window.onload = () => {
@@ -141,8 +143,8 @@
             try {
                 while (keepFetching) {
                     loadingText.innerText = `Downloading... (${allData.length} rows)`;
-                    // Updated Supabase query to include 'soc'
-                    const url = `${SUPABASE_URL}/rest/v1/solar_telemetry?created_at=gte.${startISO}&created_at=lte.${endISO}&select=created_at,battery_v,load_w,soc&order=created_at.asc&limit=${limit}&offset=${offset}`;
+                    // Added battery_a to the select query
+                    const url = `${SUPABASE_URL}/rest/v1/solar_telemetry?created_at=gte.${startISO}&created_at=lte.${endISO}&select=created_at,battery_v,battery_a,load_w,soc&order=created_at.asc&limit=${limit}&offset=${offset}`;
 
                     const response = await fetch(url, {
                         headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
@@ -165,6 +167,7 @@
                 
                 const socData = [];
                 const voltageData = [];
+                const currentData = []; // New array for Amps
                 const loadData = [];
 
                 for (let i = 0; i < allData.length; i += step) {
@@ -176,10 +179,12 @@
 
                     if (row.soc !== null && row.soc !== undefined) socData.push([timestamp, row.soc]);
                     if (row.battery_v !== null) voltageData.push([timestamp, row.battery_v]);
+                    if (row.battery_a !== null) currentData.push([timestamp, row.battery_a]); // Push Amps
                     if (row.load_w !== null) loadData.push([timestamp, row.load_w]);
                 }
 
-                renderCharts(socData, voltageData, loadData);
+                // Pass the new current array to the renderer
+                renderCharts(socData, voltageData, currentData, loadData);
                 
             } catch (error) {
                 console.error("Error fetching data:", error);
@@ -189,13 +194,13 @@
             }
         }
 
-        function renderCharts(socData, voltageData, loadData) {
+        function renderCharts(socData, voltageData, currentData, loadData) {
             const commonOptions = {
                 chart: {
                     type: 'area', height: 250, background: '#1e1e1e',
                     animations: { enabled: false },
                     toolbar: { autoSelected: 'zoom' },
-                    group: 'solar-sync', // This links all 3 charts together!
+                    group: 'solar-sync', // This links all 4 charts together!
                     id: 'base-chart'
                 },
                 theme: { mode: 'dark' },
@@ -225,6 +230,16 @@
                 yaxis: { title: { text: 'Volts' }, decimalsInFloat: 2, forceNiceScale: true }
             };
 
+            // --- CURRENT CHART (NEW) ---
+            const currentOptions = {
+                ...commonOptions,
+                chart: { ...commonOptions.chart, id: 'current-chart' },
+                series: [{ name: 'Battery Current (A)', data: currentData }],
+                colors: ['#ff9f43'], // Orange to match your ESP32 UI
+                title: { text: 'Battery Current (Amps)', align: 'left', style: { color: '#fff' } },
+                yaxis: { title: { text: 'Amps' }, decimalsInFloat: 2, forceNiceScale: true }
+            };
+
             // --- LOAD CHART ---
             const loadOptions = {
                 ...commonOptions,
@@ -235,16 +250,22 @@
                 yaxis: { title: { text: 'Watts' }, decimalsInFloat: 0 }
             };
 
+            // Destroy old instances to prevent ghosting
             if (socChartInstance) socChartInstance.destroy();
             if (voltChartInstance) voltChartInstance.destroy();
+            if (currentChartInstance) currentChartInstance.destroy();
             if (loadChartInstance) loadChartInstance.destroy();
 
+            // Create new charts
             socChartInstance = new ApexCharts(document.querySelector("#socChart"), socOptions);
             voltChartInstance = new ApexCharts(document.querySelector("#voltageChart"), voltOptions);
+            currentChartInstance = new ApexCharts(document.querySelector("#currentChart"), currentOptions);
             loadChartInstance = new ApexCharts(document.querySelector("#loadChart"), loadOptions);
 
+            // Render charts
             socChartInstance.render();
             voltChartInstance.render();
+            currentChartInstance.render();
             loadChartInstance.render();
         }
     </script>
