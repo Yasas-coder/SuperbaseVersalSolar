@@ -96,12 +96,12 @@
                     <h3>Relay ${i + 1}: ${relayNames[i]} Schedule</h3>
                     <div class="sub-box">
                         <label>Turn ON at Hour (0-23):</label>
-                        <input type="number" min="0" max="23" id="on_h_${i}" value="${i === 0 ? 16 : 18}">
+                        <input type="number" min="0" max="23" id="on_h_${i}" placeholder="e.g. 18">
                         <label>Turn OFF at Hour (0-23):</label>
-                        <input type="number" min="0" max="23" id="off_h_${i}" value="6">
+                        <input type="number" min="0" max="23" id="off_h_${i}" placeholder="e.g. 6">
                         <label>Timer Duration (Mins):</label>
-                        <input type="number" min="1" max="1440" id="timer_m_${i}" value="30">
-                        <button class="off" style="width:100%; margin-top:8px;" onclick="saveSchedule(${i})">Save Relay ${i + 1} Schedule</button>
+                        <input type="number" min="1" max="1440" id="timer_m_${i}" placeholder="e.g. 30">
+                        <button class="off" style="width:100%; margin-top:8px;" onclick="saveSchedule(${i})">Send Update to Relay ${i + 1}</button>
                     </div>
                 </div>
                 `);
@@ -114,20 +114,20 @@
     <div class="grid">
         <div class="card">
             <h3>⚡ CEB Charger Boundaries</h3>
-            <label>Turn ON Voltage (V):</label>
-            <input type="number" step="0.1" id="ceb_on" value="11.5">
-            <label>Turn OFF Voltage (V):</label>
-            <input type="number" step="0.1" id="ceb_off" value="13.8">
-            <button class="off" style="width:100%; margin-top:8px;" onclick="updateConfig()">Apply Thresholds</button>
+            <label>Turn ON Target (SOC %):</label>
+            <input type="number" step="0.1" id="ceb_on" placeholder="e.g. 20.0">
+            <label>Turn OFF Target (SOC %):</label>
+            <input type="number" step="0.1" id="ceb_off" placeholder="e.g. 80.0">
+            <button class="off" style="width:100%; margin-top:8px;" onclick="updateConfig()">Send Charger Updates</button>
         </div>
 
         <div class="card">
             <h3>🚨 Alarm & Strobe Limits</h3>
             <label>Critical Alarm Trigger (V):</label>
-            <input type="number" step="0.1" id="al_v" value="10.5">
+            <input type="number" step="0.1" id="al_v" placeholder="e.g. 10.5">
             <label>Strobe Flashing Rate (Sec):</label>
-            <input type="number" id="al_strobe" value="4">
-            <button class="off" style="width:100%; margin-top:8px;" onclick="updateConfig()">Apply Alarm Limits</button>
+            <input type="number" id="al_strobe" placeholder="e.g. 4">
+            <button class="off" style="width:100%; margin-top:8px;" onclick="updateConfig()">Send Alarm Updates</button>
         </div>
 
         <div class="card">
@@ -146,7 +146,7 @@
     // 1. SUPABASE LIVE TELEMETRY & LOCAL IP FETCHING
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const SUPABASE_URL = "https://znwuyunwtwurrejowkaz.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_pnvIkUa0rVkghi40HAqlYQ_DNFlitDR";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpud3V5dW53dHd1cnJlam93a2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzI1MzYsImV4cCI6MjEwMTM0ODUzNn0.K5M2TbML6mWuE6O5uLkIsMIaaun1hmAl8EJeVlsoKrI";
 
     let batteryChartInstance = null;
     let loadChartInstance = null;
@@ -169,7 +169,10 @@
 
             data.reverse();
 
-            const timestamps = data.map(row => new Date(row.created_at).toLocaleTimeString());
+            const timestamps = data.map(row => {
+                let dt = new Date(row.created_at);
+                return dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            });
             const batteryV = data.map(row => row.battery_v);
             const loadW = data.map(row => row.load_w);
 
@@ -256,6 +259,8 @@
         if (message.destinationName === "mysolar_lk99/status") {
             try {
                 const status = JSON.parse(message.payloadString);
+                
+                // Only updating Relay Status Text and Local IP - Input boxes are left alone!
                 if (status.relays) {
                     const modes = ["OFF", "ON", "AUTO TIME", "AUTO VOLT", "TIMER"];
                     status.relays.forEach(r => {
@@ -266,9 +271,7 @@
                         }
                     });
                 }
-                if (status.ceb_on) document.getElementById("ceb_on").value = status.ceb_on;
-                if (status.ceb_off) document.getElementById("ceb_off").value = status.ceb_off;
-                if (status.al_v) document.getElementById("al_v").value = status.al_v;
+                
                 if (status.ip) {
                     const ipLink = document.getElementById("local-ip-link");
                     ipLink.innerText = status.ip;
@@ -290,23 +293,60 @@
         }
     }
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 3. SMART CONFIGURATION SENDER LOGIC
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     function saveSchedule(idx) {
-        const on_h = parseInt(document.getElementById(`on_h_${idx}`).value);
-        const off_h = parseInt(document.getElementById(`off_h_${idx}`).value);
-        const timer_m = parseInt(document.getElementById(`timer_m_${idx}`).value);
+        const payloadObj = { idx: idx };
+        
+        const onInput = document.getElementById(`on_h_${idx}`).value;
+        const offInput = document.getElementById(`off_h_${idx}`).value;
+        const timerInput = document.getElementById(`timer_m_${idx}`).value;
 
-        const payload = JSON.stringify({ idx, on_h, off_h, timer_m });
+        if (onInput !== "") payloadObj.on_h = parseInt(onInput);
+        if (offInput !== "") payloadObj.off_h = parseInt(offInput);
+        if (timerInput !== "") payloadObj.timer_m = parseInt(timerInput);
+
+        if (Object.keys(payloadObj).length === 1) {
+            alert("Please enter at least one value to update.");
+            return;
+        }
+
+        const payload = JSON.stringify(payloadObj);
         sendMQTT("mysolar_lk99/schedule/set", payload);
+        
+        // Clear inputs after sending
+        document.getElementById(`on_h_${idx}`).value = "";
+        document.getElementById(`off_h_${idx}`).value = "";
+        document.getElementById(`timer_m_${idx}`).value = "";
     }
 
     function updateConfig() {
-        const ceb_on = parseFloat(document.getElementById("ceb_on").value);
-        const ceb_off = parseFloat(document.getElementById("ceb_off").value);
-        const al_v = parseFloat(document.getElementById("al_v").value);
-        const al_strobe = parseInt(document.getElementById("al_strobe").value);
+        const payloadObj = {};
+        
+        const cebOn = document.getElementById("ceb_on").value;
+        const cebOff = document.getElementById("ceb_off").value;
+        const alV = document.getElementById("al_v").value;
+        const alStrobe = document.getElementById("al_strobe").value;
 
-        const payload = JSON.stringify({ ceb_on, ceb_off, al_v, al_strobe });
+        if (cebOn !== "") payloadObj.ceb_on = parseFloat(cebOn);
+        if (cebOff !== "") payloadObj.ceb_off = parseFloat(cebOff);
+        if (alV !== "") payloadObj.al_v = parseFloat(alV);
+        if (alStrobe !== "") payloadObj.al_strobe = parseInt(alStrobe);
+
+        if (Object.keys(payloadObj).length === 0) {
+            alert("Please enter at least one setting to update.");
+            return;
+        }
+
+        const payload = JSON.stringify(payloadObj);
         sendMQTT("mysolar_lk99/config/set", payload);
+        
+        // Clear inputs after sending
+        document.getElementById("ceb_on").value = "";
+        document.getElementById("ceb_off").value = "";
+        document.getElementById("al_v").value = "";
+        document.getElementById("al_strobe").value = "";
     }
 
     function calibrateINA() {
@@ -314,6 +354,8 @@
         if (!real_c || real_c <= 0) { alert("Enter valid current in Amperes"); return; }
         const payload = JSON.stringify({ real_c });
         sendMQTT("mysolar_lk99/calibrate/ina", payload);
+        
+        document.getElementById("real_c").value = "";
     }
 </script>
 
