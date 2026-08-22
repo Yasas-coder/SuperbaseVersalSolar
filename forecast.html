@@ -12,6 +12,7 @@
       --accent-color: #00adb5;
       --warning-color: #ff9f43;
       --alert-color: #ff2e63;
+      --soc-color: #4cd137;
       --text-color: #e0e0e0;
       --subtext-color: #aaa;
     }
@@ -28,6 +29,7 @@
     .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
     .metric-box { background-color: #252525; padding: 15px; border-radius: 6px; border-left: 4px solid var(--accent-color); }
     .metric-box.highlight { border-left-color: var(--warning-color); }
+    .metric-box.soc-highlight { border-left-color: var(--soc-color); }
     .metric-box .label { font-size: 0.85em; color: var(--subtext-color); text-transform: uppercase; letter-spacing: 0.5px; }
     .metric-box .value { font-size: 1.8em; font-weight: bold; margin-top: 5px; }
     .unit { font-size: 0.5em; color: var(--subtext-color); }
@@ -39,7 +41,7 @@
     button:hover { background-color: #008c93; }
     .progress-bar-bg { background-color: #333; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 10px; }
     .progress-bar-fill { background-color: var(--accent-color); height: 100%; width: 0%; transition: width 0.4s ease; }
-    .status-text { font-size: 0.85em; color: var(--subtext-color); margin-top: 15px; }
+    .status-text { font-size: 0.85em; color: var(--subtext-color); margin-top: 5px; }
   </style>
 </head>
 <body>
@@ -80,20 +82,32 @@
       </div>
     </div>
 
-    <!-- DAILY VOLTAGE HEALTH CARD -->
+    <!-- DAILY VOLTAGE & SOC HEALTH CARD -->
     <div class="card">
       <h3>☀️ Daily Battery Health & Solar Peak</h3>
       <div class="grid-3">
         <div class="metric-box">
-          <div class="label">Today's Peak Voltage (Max)</div>
+          <div class="label">Today's Peak Voltage</div>
           <div class="value" id="val-max-v">-- <span class="unit">V</span></div>
-          <div class="status-text" id="time-max-v" style="margin-top: 5px;">Time: --:--</div>
+          <div class="status-text" id="time-max-v">Time: --:--</div>
         </div>
 
         <div class="metric-box">
-          <div class="label">Today's Lowest Voltage (Min)</div>
+          <div class="label">Today's Lowest Voltage</div>
           <div class="value" id="val-min-v">-- <span class="unit">V</span></div>
-          <div class="status-text" id="time-min-v" style="margin-top: 5px;">Time: --:--</div>
+          <div class="status-text" id="time-min-v">Time: --:--</div>
+        </div>
+
+        <div class="metric-box soc-highlight">
+          <div class="label">Today's Max SOC</div>
+          <div class="value" id="val-max-soc" style="color: var(--soc-color);">-- <span class="unit">%</span></div>
+          <div class="status-text" id="time-max-soc">Time: --:--</div>
+        </div>
+
+        <div class="metric-box soc-highlight">
+          <div class="label">Today's Min SOC</div>
+          <div class="value" id="val-min-soc" style="color: var(--soc-color);">-- <span class="unit">%</span></div>
+          <div class="status-text" id="time-min-soc">Time: --:--</div>
         </div>
       </div>
     </div>
@@ -145,7 +159,7 @@
       </form>
     </div>
 
-    <div class="status-text" id="last-updated">Connecting to Supabase...</div>
+    <div class="status-text" id="last-updated" style="margin-top: 20px;">Connecting to Supabase...</div>
   </div>
 
   <script>
@@ -153,7 +167,7 @@
     // ⚡ SUPABASE INITIALIZATION
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const SUPABASE_URL = "https://znwuyunwtwurrejowkaz.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_pnvIkUa0rVkghi40HAqlYQ_DNFlitDR";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpud3V5dW53dHd1cnJlam93a2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzI1MzYsImV4cCI6MjEwMTM0ODUzNn0.K5M2TbML6mWuE6O5uLkIsMIaaun1hmAl8EJeVlsoKrI";
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     // Initialize with safe defaults (today's date)
@@ -168,23 +182,17 @@
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     function getBillingWindow(dateString, durationDays) {
       const now = new Date();
-      
-      // Parse YYYY-MM-DD cleanly to avoid timezone shifts
       const [y, m, d] = dateString.split('-');
       const cycleStart = new Date(y, m - 1, d, 0, 0, 0);
-
-      // Add durationDays directly in milliseconds
       const cycleEnd = new Date(cycleStart.getTime() + (durationDays * 24 * 60 * 60 * 1000));
-
       return { cycleStart, cycleEnd, now };
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 📊 DATA FETCH & FORECAST CALCULATION
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-async function fetchForecastData() {
+    async function fetchForecastData() {
       try {
-        // 1. Fetch settings from app_settings table
         const { data: settingsData } = await _supabase
           .from('app_settings')
           .select('*')
@@ -201,13 +209,11 @@ async function fetchForecastData() {
           document.getElementById('energy_offset').value = currentSettings.energy_offset;
         }
 
-        // 2. Compute Billing Window
         const { cycleStart, cycleEnd, now } = getBillingWindow(currentSettings.last_billing_date, currentSettings.cycle_days);
         
         document.getElementById('cycle-dates').innerText = 
           `Current Cycle: ${cycleStart.toLocaleDateString()} to ${cycleEnd.toLocaleDateString()} (${currentSettings.cycle_days} Days)`;
 
-        // 3. Fetch latest reading from solar_telemetry
         const { data: latestData } = await _supabase
           .from('solar_telemetry')
           .select('ac_energy, created_at')
@@ -216,7 +222,6 @@ async function fetchForecastData() {
           .limit(1)
           .maybeSingle();
 
-        // 4. Fetch baseline reading at start of cycle (or earliest available)
         const { data: startData } = await _supabase
           .from('solar_telemetry')
           .select('ac_energy, created_at')
@@ -226,7 +231,6 @@ async function fetchForecastData() {
           .limit(1)
           .maybeSingle();
 
-        // 5. Fetch baseline reading for midnight today
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
 
@@ -241,29 +245,21 @@ async function fetchForecastData() {
 
         if (latestData && latestData.ac_energy !== null) {
           const currentReading = latestData.ac_energy;
-          
-          // Safe Fallbacks if historical baseline rows don't exist
           const startReading = (startData && startData.ac_energy !== null) ? startData.ac_energy : currentReading;
           const todayStartReading = (todayStartData && todayStartData.ac_energy !== null) ? todayStartData.ac_energy : currentReading;
 
-          // Math: Total Used in Cycle (+ Custom Offset)
           const rawUsed = Math.max(0, currentReading - startReading);
           const totalUsed = rawUsed + parseFloat(currentSettings.energy_offset);
-
-          // Math: Used Today
           const usedToday = Math.max(0, currentReading - todayStartReading);
 
-          // Calculate cycle durations for Month-End Projection
           const totalCycleMs = cycleEnd - cycleStart;
           const elapsedMs = Math.max(1000 * 60 * 60, now - cycleStart); 
           const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
           const totalCycleDays = currentSettings.cycle_days;
 
-          // Project forward linearly using the cycle average
           const dailyAvg = totalUsed / elapsedDays;
           const forecastedTotal = dailyAvg * totalCycleDays;
 
-          // Render DOM
           document.getElementById('val-used').innerHTML = `${totalUsed.toFixed(2)} <span class="unit">kWh</span>`;
           document.getElementById('val-today').innerHTML = `${usedToday.toFixed(2)} <span class="unit">kWh</span>`;
           document.getElementById('val-forecast').innerHTML = `${forecastedTotal.toFixed(2)} <span class="unit">kWh</span>`;
@@ -309,53 +305,85 @@ async function fetchForecastData() {
         statusEl.innerText = "Settings Saved!";
         statusEl.style.color = "var(--accent-color)";
         setTimeout(() => statusEl.innerText = "", 3000);
-        fetchForecastData(); // Recalculate immediately with new parameters
+        fetchForecastData(); 
       }
     });
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // ☀️ DAILY MIN / MAX VOLTAGE CALCULATOR
+    // ☀️ DAILY MIN / MAX (VOLTAGE & SOC) WITH GHOST FILTER
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    async function fetchDailyVoltageStats() {
+    async function fetchDailyHealthStats() {
       const startOfToday = new Date();
       startOfToday.setHours(0, 0, 0, 0);
 
       try {
-        // Query 1: Get the single highest voltage row from today
-        const { data: maxData } = await _supabase
+        // Query 1: Max Voltage (Ignore ghost 0Vs by filtering > 1.0V)
+        const { data: maxVData } = await _supabase
           .from('solar_telemetry')
           .select('battery_v, created_at')
           .gte('created_at', startOfToday.toISOString())
+          .gt('battery_v', 1.0)
           .not('battery_v', 'is', null)
-          .order('battery_v', { ascending: false }) // Sort Highest to Lowest
+          .order('battery_v', { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        // Query 2: Get the single lowest voltage row from today
-        const { data: minData } = await _supabase
+        // Query 2: Min Voltage
+        const { data: minVData } = await _supabase
           .from('solar_telemetry')
           .select('battery_v, created_at')
           .gte('created_at', startOfToday.toISOString())
+          .gt('battery_v', 1.0)
           .not('battery_v', 'is', null)
-          .order('battery_v', { ascending: true }) // Sort Lowest to Highest
+          .order('battery_v', { ascending: true }) 
           .limit(1)
           .maybeSingle();
 
-        if (maxData) {
-          document.getElementById('val-max-v').innerHTML = `${maxData.battery_v.toFixed(2)} <span class="unit">V</span>`;
-          document.getElementById('time-max-v').innerText = `Time: ${new Date(maxData.created_at).toLocaleTimeString()}`;
+        // Query 3: Max SOC
+        const { data: maxSocData } = await _supabase
+          .from('solar_telemetry')
+          .select('soc, created_at')
+          .gte('created_at', startOfToday.toISOString())
+          .gt('battery_v', 1.0) // Ghost noise filter
+          .not('soc', 'is', null)
+          .order('soc', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        // Query 4: Min SOC
+        const { data: minSocData } = await _supabase
+          .from('solar_telemetry')
+          .select('soc, created_at')
+          .gte('created_at', startOfToday.toISOString())
+          .gt('battery_v', 1.0) // Ghost noise filter
+          .not('soc', 'is', null)
+          .order('soc', { ascending: true }) 
+          .limit(1)
+          .maybeSingle();
+
+        // Render Voltage Stats
+        if (maxVData) {
+          document.getElementById('val-max-v').innerHTML = `${maxVData.battery_v.toFixed(2)} <span class="unit">V</span>`;
+          document.getElementById('time-max-v').innerText = `Time: ${new Date(maxVData.created_at).toLocaleTimeString()}`;
         }
-        if (minData) {
-          document.getElementById('val-min-v').innerHTML = `${minData.battery_v.toFixed(2)} <span class="unit">V</span>`;
-          document.getElementById('time-min-v').innerText = `Time: ${new Date(minData.created_at).toLocaleTimeString()}`;
+        if (minVData) {
+          document.getElementById('val-min-v').innerHTML = `${minVData.battery_v.toFixed(2)} <span class="unit">V</span>`;
+          document.getElementById('time-min-v').innerText = `Time: ${new Date(minVData.created_at).toLocaleTimeString()}`;
+        }
+
+        // Render SOC Stats
+        if (maxSocData) {
+          document.getElementById('val-max-soc').innerHTML = `${maxSocData.soc.toFixed(1)} <span class="unit">%</span>`;
+          document.getElementById('time-max-soc').innerText = `Time: ${new Date(maxSocData.created_at).toLocaleTimeString()}`;
+        }
+        if (minSocData) {
+          document.getElementById('val-min-soc').innerHTML = `${minSocData.soc.toFixed(1)} <span class="unit">%</span>`;
+          document.getElementById('time-min-soc').innerText = `Time: ${new Date(minSocData.created_at).toLocaleTimeString()}`;
         }
       } catch (err) {
-        console.error("Error fetching voltage stats:", err);
+        console.error("Error fetching health stats:", err);
       }
     }
-
-    // Call it immediately on load, and add it to your 30-second interval if you want live updates
-    fetchDailyVoltageStats();
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 💾 EXCEL / CSV EXPORTER WITH PAGINATION
@@ -380,7 +408,6 @@ async function fetchForecastData() {
       let hasMore = true;
 
       try {
-        // Loop to bypass the 1000 row limit
         while (hasMore) {
           const { data, error } = await _supabase
             .from(tableName)
@@ -408,15 +435,14 @@ async function fetchForecastData() {
           return;
         }
 
-        // Convert the raw JSON array into CSV format
         const headers = Object.keys(allData[0]);
         const csvRows = [];
-        csvRows.push(headers.join(',')); // Add header row
+        csvRows.push(headers.join(','));
 
         for (const row of allData) {
           const values = headers.map(header => {
             const val = row[header] !== null ? row[header] : '';
-            const escaped = ('' + val).replace(/"/g, '""'); // Escape quotes for Excel safety
+            const escaped = ('' + val).replace(/"/g, '""'); 
             return `"${escaped}"`;
           });
           csvRows.push(values.join(','));
@@ -424,7 +450,6 @@ async function fetchForecastData() {
 
         const csvString = csvRows.join('\n');
         
-        // Create a downloadable Blob file inside the browser
         const blob = new Blob([csvString], { type: 'text/csv' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -444,9 +469,15 @@ async function fetchForecastData() {
       }
     }
 
-    // Auto-refresh loop
+    // Call functions immediately on load
     fetchForecastData();
-    setInterval(fetchForecastData, 30000);
+    fetchDailyHealthStats();
+
+    // Auto-refresh loops
+    setInterval(() => {
+      fetchForecastData();
+      fetchDailyHealthStats();
+    }, 30000);
   </script>
 </body>
 </html>
