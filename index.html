@@ -117,11 +117,6 @@
                 <div class="value" id="val-ah-out" style="color: var(--alert-color);">-- <span class="unit">Ah</span></div>
                 <div class="status-text">Since configured reset hour</div>
             </div>
-            <div class="metric-box soc-highlight">
-                <div class="label">Today's Max SOC</div>
-                <div class="value" id="val-max-soc" style="color: var(--soc-color);">-- <span class="unit">%</span></div>
-                <div class="status-text" id="time-max-soc">Time: --:--</div>
-            </div>
             <div class="metric-box highlight">
                 <div class="label">Today's Peak Voltage</div>
                 <div class="value" id="val-max-v">-- <span class="unit">V</span></div>
@@ -132,6 +127,16 @@
                 <div class="value" id="val-min-v">-- <span class="unit">V</span></div>
                 <div class="status-text" id="time-min-v">Time: --:--</div>
             </div>
+            <div class="metric-box soc-highlight">
+                <div class="label">Today's Max SOC</div>
+                <div class="value" id="val-max-soc" style="color: var(--soc-color);">-- <span class="unit">%</span></div>
+                <div class="status-text" id="time-max-soc">Time: --:--</div>
+            </div>
+            <div class="metric-box soc-highlight" style="border-left-color: var(--alert-color);">
+                <div class="label">Today's Min SOC</div>
+                <div class="value" id="val-min-soc" style="color: var(--alert-color);">-- <span class="unit">%</span></div>
+                <div class="status-text" id="time-min-soc">Time: --:--</div>
+            </div>
         </div>
     </div>
 
@@ -140,14 +145,12 @@
     <div class="grid">
         <div class="card">
             <h3>Battery Bus Potential (V)</h3>
-            <!-- FIXED THE GRAPH STRETCHING BUG BY WRAPPING IT IN A CONSTRAINED DIV -->
             <div style="position: relative; height: 250px; width: 100%;">
                 <canvas id="batteryChart"></canvas>
             </div>
         </div>
         <div class="card">
             <h3>AC Power Consumption (W)</h3>
-            <!-- FIXED THE GRAPH STRETCHING BUG BY WRAPPING IT IN A CONSTRAINED DIV -->
             <div style="position: relative; height: 250px; width: 100%;">
                 <canvas id="loadChart"></canvas>
             </div>
@@ -386,6 +389,7 @@
             const { data: maxVData } = await _supabase.from('solar_telemetry').select('battery_v, created_at').gte('created_at', startOfToday.toISOString()).gt('battery_v', 1.0).not('battery_v', 'is', null).order('battery_v', { ascending: false }).limit(1).maybeSingle();
             const { data: minVData } = await _supabase.from('solar_telemetry').select('battery_v, created_at').gte('created_at', startOfToday.toISOString()).gt('battery_v', 1.0).not('battery_v', 'is', null).order('battery_v', { ascending: true }).limit(1).maybeSingle();
             const { data: maxSocData } = await _supabase.from('solar_telemetry').select('soc, created_at').gte('created_at', startOfToday.toISOString()).gt('battery_v', 1.0).not('soc', 'is', null).order('soc', { ascending: false }).limit(1).maybeSingle();
+            const { data: minSocData } = await _supabase.from('solar_telemetry').select('soc, created_at').gte('created_at', startOfToday.toISOString()).gt('battery_v', 1.0).not('soc', 'is', null).order('soc', { ascending: true }).limit(1).maybeSingle();
 
             if (maxVData) {
                 document.getElementById('val-max-v').innerHTML = `${maxVData.battery_v.toFixed(2)} <span class="unit">V</span>`;
@@ -398,6 +402,10 @@
             if (maxSocData) {
                 document.getElementById('val-max-soc').innerHTML = `${maxSocData.soc.toFixed(1)} <span class="unit">%</span>`;
                 document.getElementById('time-max-soc').innerText = `Time: ${new Date(maxSocData.created_at).toLocaleTimeString()}`;
+            }
+            if (minSocData) {
+                document.getElementById('val-min-soc').innerHTML = `${minSocData.soc.toFixed(1)} <span class="unit">%</span>`;
+                document.getElementById('time-min-soc').innerText = `Time: ${new Date(minSocData.created_at).toLocaleTimeString()}`;
             }
         } catch (err) { console.error("Health Stats Error:", err); }
     }
