@@ -140,11 +140,17 @@
     <div class="grid">
         <div class="card">
             <h3>Battery Bus Potential (V)</h3>
-            <canvas id="batteryChart"></canvas>
+            <!-- FIXED THE GRAPH STRETCHING BUG BY WRAPPING IT IN A CONSTRAINED DIV -->
+            <div style="position: relative; height: 250px; width: 100%;">
+                <canvas id="batteryChart"></canvas>
+            </div>
         </div>
         <div class="card">
             <h3>AC Power Consumption (W)</h3>
-            <canvas id="loadChart"></canvas>
+            <!-- FIXED THE GRAPH STRETCHING BUG BY WRAPPING IT IN A CONSTRAINED DIV -->
+            <div style="position: relative; height: 250px; width: 100%;">
+                <canvas id="loadChart"></canvas>
+            </div>
         </div>
     </div>
 
@@ -271,8 +277,10 @@
             }
 
             // Render Ah In / Ah Out
-            if (data[0].ah_charged !== undefined) {
+            if (data[0].ah_charged !== undefined && data[0].ah_charged !== null) {
                 document.getElementById('val-ah-in').innerHTML = `${data[0].ah_charged.toFixed(2)} <span class="unit">Ah</span>`;
+            }
+            if (data[0].ah_discharged !== undefined && data[0].ah_discharged !== null) {
                 document.getElementById('val-ah-out').innerHTML = `${data[0].ah_discharged.toFixed(2)} <span class="unit">Ah</span>`;
             }
 
