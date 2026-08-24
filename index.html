@@ -3,45 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solar Telemetry & Remote Control</title>
-    <!-- Chart.js for Graphs -->
+    <title>Solar Cloud OS</title>
+    
+    <!-- Supabase, Chart.js, and Paho MQTT -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Paho MQTT Library for WebSockets -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #fff; margin: 0; padding: 20px; }
-        h1, h2 { text-align: center; color: #00adb5; }
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --accent-color: #00adb5;
+            --warning-color: #ff9f43;
+            --alert-color: #ff2e63;
+            --soc-color: #4cd137;
+            --text-color: #e0e0e0;
+            --subtext-color: #aaa;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
         .container { max-width: 1100px; margin: 0 auto; }
+        h1, h2, h3 { color: var(--accent-color); margin-bottom: 10px; }
         .status-bar { text-align: center; padding: 10px; margin-bottom: 20px; border-radius: 6px; font-weight: bold; background: #222; }
+        .card { background-color: var(--card-bg); border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
-        .card { background-color: #1e1e1e; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+        
+        .metric-box { background-color: #252525; padding: 15px; border-radius: 6px; border-left: 4px solid var(--accent-color); }
+        .metric-box.highlight { border-left-color: var(--warning-color); }
+        .metric-box.soc-highlight { border-left-color: var(--soc-color); }
+        .metric-box .label { font-size: 0.85em; color: var(--subtext-color); text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-box .value { font-size: 1.8em; font-weight: bold; margin-top: 5px; }
+        .unit { font-size: 0.5em; color: var(--subtext-color); }
+        
         .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-        button { background: #333; color: white; border: none; padding: 10px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; flex: 1; min-width: 60px; }
+        button { background: #333; color: white; border: none; padding: 10px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; flex: 1; min-width: 60px; transition: background 0.2s;}
         button:hover { background: #444; }
         button.on { background: #ff2e63; }
         button.off { background: #00adb5; }
         button.auto { background: #ff9f43; }
         button.timer { background: #7b1fa2; }
         button.danger { background: #d32f2f; }
-        input[type="number"], input[type="text"] { background: #121212; border: 1px solid #444; color: #fff; padding: 8px; border-radius: 4px; width: calc(100% - 18px); margin: 6px 0; }
-        label { font-size: 0.85em; color: #aaa; }
+        button.action { background-color: var(--accent-color); }
+        
+        .form-group { margin-bottom: 15px; }
+        label { font-size: 0.85em; color: #aaa; display: block; margin-bottom: 5px; }
+        input[type="number"], input[type="text"], input[type="date"] { background: #121212; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; width: 100%; box-sizing: border-box; }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
         .sub-box { background: #252525; padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #00adb5; }
+        
         .terminal { background-color: #000; color: #00ff66; font-family: 'Courier New', Courier, monospace; padding: 15px; border-radius: 6px; height: 200px; overflow-y: auto; font-size: 0.85em; line-height: 1.4; }
+        .progress-bar-bg { background-color: #333; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 10px; }
+        .progress-bar-fill { background-color: var(--accent-color); height: 100%; width: 0%; transition: width 0.4s ease; }
+        .status-text { font-size: 0.85em; color: var(--subtext-color); margin-top: 5px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>☀️ Solar Infrastructure Cloud OS</h1>
+    <h1 style="text-align: center;">☀️ Solar Infrastructure Cloud OS</h1>
     
     <div id="mqtt-status" class="status-bar" style="color: #ff9f43;">🔌 Connecting to MQTT Broker...</div>
-    <a href="/forecast.html" style="padding: 10px; background: #00adb5; color: white; text-decoration: none; border-radius: 4px;">📊 Go to Billing Forecast</a>
 
     <!-- System Info Bar -->
-    <div class="card" style="margin-bottom: 20px; text-align: center;">
+    <div class="card" style="text-align: center;">
         <p style="margin: 0; font-size: 1.1em;">
-            🌐 <b>ESP32 Local IP:</b> <a id="local-ip-link" href="#" target="_blank" style="color: #00adb5; text-decoration: none; font-weight: bold;">Fetching...</a>
+            🌐 <b>ESP32 Local IP:</b> <a id="local-ip-link" href="#" target="_blank" style="color: var(--accent-color); text-decoration: none; font-weight: bold;">Fetching...</a>
         </p>
+    </div>
+
+    <!-- MAIN FORECAST CARD -->
+    <div class="card">
+        <h2>📅 Billing Cycle Forecast</h2>
+        <p id="cycle-dates" style="color: var(--subtext-color); margin-top: -5px;">Calculating cycle dates...</p>
+
+        <div class="grid-3">
+            <div class="metric-box">
+                <div class="label">Used So Far</div>
+                <div class="value" id="val-used">-- <span class="unit">kWh</span></div>
+            </div>
+            <div class="metric-box">
+                <div class="label">Used Today</div>
+                <div class="value" id="val-today">-- <span class="unit">kWh</span></div>
+            </div>
+            <div class="metric-box highlight">
+                <div class="label">Projected Month End</div>
+                <div class="value" id="val-forecast" style="color: var(--warning-color);">-- <span class="unit">kWh</span></div>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.85em; color: var(--subtext-color);">
+                <span>Cycle Progress</span>
+                <span id="cycle-progress-text">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="cycle-progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DAILY VOLTAGE & SOC HEALTH CARD -->
+    <div class="card">
+        <h3>☀️ Daily Battery Health & Solar Peak</h3>
+        <div class="grid-3">
+            <div class="metric-box">
+                <div class="label">Charged Today (Solar)</div>
+                <div class="value" id="val-ah-in" style="color: var(--accent-color);">-- <span class="unit">Ah</span></div>
+                <div class="status-text">Since configured reset hour</div>
+            </div>
+            <div class="metric-box">
+                <div class="label">Discharged Today (Load)</div>
+                <div class="value" id="val-ah-out" style="color: var(--alert-color);">-- <span class="unit">Ah</span></div>
+                <div class="status-text">Since configured reset hour</div>
+            </div>
+            <div class="metric-box soc-highlight">
+                <div class="label">Today's Max SOC</div>
+                <div class="value" id="val-max-soc" style="color: var(--soc-color);">-- <span class="unit">%</span></div>
+                <div class="status-text" id="time-max-soc">Time: --:--</div>
+            </div>
+            <div class="metric-box highlight">
+                <div class="label">Today's Peak Voltage</div>
+                <div class="value" id="val-max-v">-- <span class="unit">V</span></div>
+                <div class="status-text" id="time-max-v">Time: --:--</div>
+            </div>
+            <div class="metric-box highlight">
+                <div class="label">Today's Lowest Voltage</div>
+                <div class="value" id="val-min-v">-- <span class="unit">V</span></div>
+                <div class="status-text" id="time-min-v">Time: --:--</div>
+            </div>
+        </div>
     </div>
 
     <!-- Live Supabase Graphs -->
@@ -72,7 +163,7 @@
                 document.write(`
                 <div class="card">
                     <h3>Relay ${i + 1}: ${relayNames[i]}</h3>
-                    <p>Status: <span id="r_stat_${i}" style="color: #00adb5; font-weight: bold;">UNKNOWN</span></p>
+                    <p>Status: <span id="r_stat_${i}" style="color: var(--accent-color); font-weight: bold;">UNKNOWN</span></p>
                     <div class="btn-group">
                         <button class="on" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'ON')">ON</button>
                         <button class="off" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'OFF')">OFF</button>
@@ -110,95 +201,104 @@
     </div>
 
     <!-- System Configurations & Commands -->
-    <h2>⚙️ System Boundaries & Control</h2>
+    <h2>⚙️ System Boundaries & Web Configurations</h2>
     <div class="grid">
+        
         <div class="card">
-            <h3>⚡ CEB Charger Boundaries</h3>
+            <h3>⚡ System Boundaries (MQTT)</h3>
             <label>Turn ON Target (SOC %):</label>
             <input type="number" step="0.1" id="ceb_on" placeholder="e.g. 20.0">
             <label>Turn OFF Target (SOC %):</label>
             <input type="number" step="0.1" id="ceb_off" placeholder="e.g. 80.0">
-            <button class="off" style="width:100%; margin-top:8px;" onclick="updateConfig()">Send Charger Updates</button>
+            <label>Daily Ah Reset Hour (0-23):</label>
+            <input type="number" id="ah_reset" min="0" max="23" placeholder="e.g. 6">
+            <button class="off" style="width:100%; margin-top:8px;" onclick="updateConfig()">Push Settings to ESP32</button>
         </div>
 
         <div class="card">
-            <h3>🚨 Alarm & Strobe Limits</h3>
-            <label>Critical Alarm Trigger (V):</label>
-            <input type="number" step="0.1" id="al_v" placeholder="e.g. 10.5">
-            <label>Strobe Flashing Rate (Sec):</label>
-            <input type="number" id="al_strobe" placeholder="e.g. 4">
-            <button class="off" style="width:100%; margin-top:8px;" onclick="updateConfig()">Send Alarm Updates</button>
+            <h3>⚙️ Forecast Settings</h3>
+            <form id="settings-form">
+                <label>Last Billing Date</label>
+                <input type="date" id="last_billing_date" required>
+                <label style="margin-top: 10px;">Cycle Duration (Days)</label>
+                <input type="number" id="cycle_days" min="1" max="60" required>
+                <label style="margin-top: 10px;">Energy Offset (+ / - kWh)</label>
+                <input type="number" id="energy_offset" step="0.001" required>
+                <button type="submit" class="action" style="width:100%; margin-top:8px;">Save Cloud Forecast Settings</button>
+                <span id="save-status" class="status-text" style="display:block; text-align:center;"></span>
+            </form>
         </div>
 
         <div class="card">
-            <h3>🛠️ INA226 Calibration & System</h3>
+            <h3>🛠️ Calibrations & Danger Zone</h3>
             <label>Measured Current (A):</label>
             <input type="number" step="0.001" id="real_c" placeholder="e.g. 5.230">
-            <button class="auto" style="width:100%; margin-top:8px;" onclick="calibrateINA()">Calibrate Current Sensor</button>
+            <button class="auto" style="width:100%; margin-top:8px;" onclick="calibrateINA()">Calibrate INA226</button>
             <hr style="border-color:#333; margin:15px 0;">
             <button class="danger" style="width:100%;" onclick="if(confirm('Execute Remote ESP32 Reboot?')) sendMQTT('mysolar_lk99/system/command', 'REBOOT')">⚠️ Remote System Reboot</button>
         </div>
+        
     </div>
 </div>
 
 <script>
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 1. SUPABASE LIVE TELEMETRY & LOCAL IP FETCHING
+    // 1. SUPABASE INITIALIZATION
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const SUPABASE_URL = "https://znwuyunwtwurrejowkaz.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpud3V5dW53dHd1cnJlam93a2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzI1MzYsImV4cCI6MjEwMTM0ODUzNn0.K5M2TbML6mWuE6O5uLkIsMIaaun1hmAl8EJeVlsoKrI";
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let batteryChartInstance = null;
     let loadChartInstance = null;
+    let currentSettings = { last_billing_date: new Date().toISOString().split('T')[0], cycle_days: 30, energy_offset: 0.0 };
 
-    async function loadData() {
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 2. DATA FETCHING (TELEMETRY, CHARTS, & LOGS)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    async function fetchCoreTelemetry() {
         try {
-            const response = await fetch(`${SUPABASE_URL}/rest/v1/solar_telemetry?select=*&order=created_at.desc&limit=30`, {
-                headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
-            });
-            const data = await response.json();
-            if(!data || data.length === 0) return;
+            // Fetch latest 30 points for Charts
+            const { data, error } = await _supabase.from('solar_telemetry').select('*').order('created_at', { ascending: false }).limit(30);
+            if (error) throw error;
+            if (!data || data.length === 0) return;
 
-            // Extract Local IP from latest entry
-            const latestEntry = data[0];
-            if (latestEntry.local_ip) {
+            // IP Update
+            if (data[0].local_ip) {
                 const ipLink = document.getElementById("local-ip-link");
-                ipLink.innerText = latestEntry.local_ip;
-                ipLink.href = `http://${latestEntry.local_ip}`;
+                ipLink.innerText = data[0].local_ip;
+                ipLink.href = `http://${data[0].local_ip}`;
             }
 
-            data.reverse();
+            // Render Ah In / Ah Out
+            if (data[0].ah_charged !== undefined) {
+                document.getElementById('val-ah-in').innerHTML = `${data[0].ah_charged.toFixed(2)} <span class="unit">Ah</span>`;
+                document.getElementById('val-ah-out').innerHTML = `${data[0].ah_discharged.toFixed(2)} <span class="unit">Ah</span>`;
+            }
 
-            const timestamps = data.map(row => {
-                let dt = new Date(row.created_at);
-                return dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            });
+            // Build Charts
+            data.reverse();
+            const timestamps = data.map(row => new Date(row.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
             const batteryV = data.map(row => row.battery_v);
             const loadW = data.map(row => row.load_w);
 
             batteryChartInstance = renderChart('batteryChart', batteryChartInstance, timestamps, batteryV, 'Battery V', '#00adb5');
             loadChartInstance = renderChart('loadChart', loadChartInstance, timestamps, loadW, 'Load (W)', '#ff2e63');
-        } catch (err) {
-            console.error("Supabase Fetch Error:", err);
-        }
+
+        } catch (err) { console.error("Telemetry Error:", err); }
     }
 
     async function fetchLogs() {
         try {
-            const response = await fetch(`${SUPABASE_URL}/rest/v1/system_logs?select=*&order=created_at.desc&limit=20`, {
-                headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
-            });
-            const logs = await response.json();
-            if (!logs || logs.length === 0) return;
+            const { data, error } = await _supabase.from('system_logs').select('*').order('created_at', { ascending: false }).limit(20);
+            if (error) throw error;
+            if (!data) return;
 
-            const terminal = document.getElementById("log-terminal");
-            terminal.innerHTML = logs.map(l => {
+            document.getElementById("log-terminal").innerHTML = data.map(l => {
                 const time = new Date(l.created_at).toLocaleTimeString();
                 return `[${time}] [${l.level}] ${l.message} (Heap: ${l.free_heap}B)`;
             }).join("<br>");
-        } catch (err) {
-            console.error("Log Fetch Error:", err);
-        }
+        } catch (err) { console.error("Log Error:", err); }
     }
 
     function renderChart(canvasId, chartInstance, labels, dataset, labelName, color) {
@@ -212,55 +312,125 @@
         return new Chart(ctx, {
             type: 'line',
             data: { labels: labels, datasets: [{ label: labelName, data: dataset, borderColor: color, tension: 0.3, fill: false }] },
-            options: { responsive: true }
+            options: { responsive: true, maintainAspectRatio: false }
         });
     }
 
-    loadData();
-    fetchLogs();
-    setInterval(loadData, 10000);
-    setInterval(fetchLogs, 5000);
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 3. FORECAST & DAILY HEALTH LOGIC
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    function getBillingWindow(dateString, durationDays) {
+      const now = new Date();
+      const [y, m, d] = dateString.split('-');
+      const cycleStart = new Date(y, m - 1, d, 0, 0, 0);
+      const cycleEnd = new Date(cycleStart.getTime() + (durationDays * 24 * 60 * 60 * 1000));
+      return { cycleStart, cycleEnd, now };
+    }
+
+    async function fetchForecastData() {
+        try {
+            const { data: settingsData } = await _supabase.from('app_settings').select('*').eq('id', 1).maybeSingle();
+            if (settingsData) {
+                currentSettings.last_billing_date = settingsData.last_billing_date || currentSettings.last_billing_date;
+                currentSettings.cycle_days = settingsData.cycle_days || currentSettings.cycle_days;
+                currentSettings.energy_offset = settingsData.energy_offset || 0.0;
+                
+                document.getElementById('last_billing_date').value = currentSettings.last_billing_date;
+                document.getElementById('cycle_days').value = currentSettings.cycle_days;
+                document.getElementById('energy_offset').value = currentSettings.energy_offset;
+            }
+
+            const { cycleStart, cycleEnd, now } = getBillingWindow(currentSettings.last_billing_date, currentSettings.cycle_days);
+            document.getElementById('cycle-dates').innerText = `Cycle: ${cycleStart.toLocaleDateString()} to ${cycleEnd.toLocaleDateString()} (${currentSettings.cycle_days} Days)`;
+
+            const { data: latestData } = await _supabase.from('solar_telemetry').select('ac_energy').not('ac_energy', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
+            const { data: startData } = await _supabase.from('solar_telemetry').select('ac_energy').gte('created_at', cycleStart.toISOString()).not('ac_energy', 'is', null).order('created_at', { ascending: true }).limit(1).maybeSingle();
+            
+            const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+            const { data: todayStartData } = await _supabase.from('solar_telemetry').select('ac_energy').gte('created_at', startOfToday.toISOString()).not('ac_energy', 'is', null).order('created_at', { ascending: true }).limit(1).maybeSingle();
+
+            if (latestData && latestData.ac_energy !== null) {
+                const currentReading = latestData.ac_energy;
+                const startReading = (startData && startData.ac_energy !== null) ? startData.ac_energy : currentReading;
+                const todayStartReading = (todayStartData && todayStartData.ac_energy !== null) ? todayStartData.ac_energy : currentReading;
+
+                const totalUsed = Math.max(0, currentReading - startReading) + parseFloat(currentSettings.energy_offset);
+                const usedToday = Math.max(0, currentReading - todayStartReading);
+
+                const totalCycleMs = cycleEnd - cycleStart;
+                const elapsedMs = Math.max(1000 * 60 * 60, now - cycleStart); 
+                const forecastedTotal = (totalUsed / (elapsedMs / 86400000)) * currentSettings.cycle_days;
+
+                document.getElementById('val-used').innerHTML = `${totalUsed.toFixed(2)} <span class="unit">kWh</span>`;
+                document.getElementById('val-today').innerHTML = `${usedToday.toFixed(2)} <span class="unit">kWh</span>`;
+                document.getElementById('val-forecast').innerHTML = `${forecastedTotal.toFixed(2)} <span class="unit">kWh</span>`;
+
+                const progressPct = Math.min(100, Math.max(0, (elapsedMs / totalCycleMs) * 100));
+                document.getElementById('cycle-progress-bar').style.width = `${progressPct.toFixed(1)}%`;
+                document.getElementById('cycle-progress-text').innerText = `${progressPct.toFixed(1)}%`;
+            }
+        } catch (err) { console.error("Forecast Error:", err); }
+    }
+
+    async function fetchDailyHealthStats() {
+        const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+        try {
+            const { data: maxVData } = await _supabase.from('solar_telemetry').select('battery_v, created_at').gte('created_at', startOfToday.toISOString()).gt('battery_v', 1.0).not('battery_v', 'is', null).order('battery_v', { ascending: false }).limit(1).maybeSingle();
+            const { data: minVData } = await _supabase.from('solar_telemetry').select('battery_v, created_at').gte('created_at', startOfToday.toISOString()).gt('battery_v', 1.0).not('battery_v', 'is', null).order('battery_v', { ascending: true }).limit(1).maybeSingle();
+            const { data: maxSocData } = await _supabase.from('solar_telemetry').select('soc, created_at').gte('created_at', startOfToday.toISOString()).gt('battery_v', 1.0).not('soc', 'is', null).order('soc', { ascending: false }).limit(1).maybeSingle();
+
+            if (maxVData) {
+                document.getElementById('val-max-v').innerHTML = `${maxVData.battery_v.toFixed(2)} <span class="unit">V</span>`;
+                document.getElementById('time-max-v').innerText = `Time: ${new Date(maxVData.created_at).toLocaleTimeString()}`;
+            }
+            if (minVData) {
+                document.getElementById('val-min-v').innerHTML = `${minVData.battery_v.toFixed(2)} <span class="unit">V</span>`;
+                document.getElementById('time-min-v').innerText = `Time: ${new Date(minVData.created_at).toLocaleTimeString()}`;
+            }
+            if (maxSocData) {
+                document.getElementById('val-max-soc').innerHTML = `${maxSocData.soc.toFixed(1)} <span class="unit">%</span>`;
+                document.getElementById('time-max-soc').innerText = `Time: ${new Date(maxSocData.created_at).toLocaleTimeString()}`;
+            }
+        } catch (err) { console.error("Health Stats Error:", err); }
+    }
+
+    document.getElementById('settings-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusEl = document.getElementById('save-status');
+        statusEl.innerText = "Saving to Cloud...";
+        statusEl.style.color = "var(--warning-color)";
+
+        const { error } = await _supabase.from('app_settings').upsert({ 
+            id: 1, 
+            last_billing_date: document.getElementById('last_billing_date').value, 
+            cycle_days: parseInt(document.getElementById('cycle_days').value), 
+            energy_offset: parseFloat(document.getElementById('energy_offset').value) 
+        });
+
+        if (error) { statusEl.innerText = "Error saving settings!"; statusEl.style.color = "var(--alert-color)"; } 
+        else { statusEl.innerText = "Settings Saved!"; statusEl.style.color = "var(--accent-color)"; setTimeout(() => statusEl.innerText = "", 3000); fetchForecastData(); }
+    });
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 2. MQTT WEBSOCKET REAL-TIME ENGINE (SECURE SSL)
+    // 4. MQTT WEBSOCKET REAL-TIME ENGINE
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const mqttBroker = "broker.hivemq.com";
-    const mqttPort = 8884; // HiveMQ Secure WSS Port (REQUIRED FOR HTTPS VERCEL)
+    const mqttPort = 8884;
     const clientID = "VercelDashboard-" + Math.floor(Math.random() * 10000);
-
     const client = new Paho.MQTT.Client(mqttBroker, mqttPort, clientID);
 
-    client.onConnectionLost = onConnectionLost;
-    client.onMessageArrived = onMessageArrived;
-
-    // Connect using SSL (useSSL: true)
-    client.connect({ onSuccess: onConnect, onFailure: onFailure, useSSL: true });
-
-    function onConnect() {
-        document.getElementById("mqtt-status").innerText = "🟢 Real-time MQTT Connected (HiveMQ)";
-        document.getElementById("mqtt-status").style.color = "#00adb5";
-        client.subscribe("mysolar_lk99/status");
-    }
-
-    function onFailure(response) {
-        document.getElementById("mqtt-status").innerText = "🔴 MQTT Connection Failed: " + response.errorMessage;
-        document.getElementById("mqtt-status").style.color = "#ff2e63";
-    }
-
-    function onConnectionLost(responseObject) {
+    client.onConnectionLost = (responseObject) => {
         if (responseObject.errorCode !== 0) {
             document.getElementById("mqtt-status").innerText = "🟡 MQTT Disconnected. Retrying...";
             document.getElementById("mqtt-status").style.color = "#ff9f43";
             setTimeout(() => client.connect({ onSuccess: onConnect, onFailure: onFailure, useSSL: true }), 5000);
         }
-    }
+    };
 
-    function onMessageArrived(message) {
+    client.onMessageArrived = (message) => {
         if (message.destinationName === "mysolar_lk99/status") {
             try {
                 const status = JSON.parse(message.payloadString);
-                
-                // Only updating Relay Status Text and Local IP - Input boxes are left alone!
                 if (status.relays) {
                     const modes = ["OFF", "ON", "AUTO TIME", "AUTO VOLT", "TIMER"];
                     status.relays.forEach(r => {
@@ -271,34 +441,36 @@
                         }
                     });
                 }
-                
-                if (status.ip) {
-                    const ipLink = document.getElementById("local-ip-link");
-                    ipLink.innerText = status.ip;
-                    ipLink.href = `http://${status.ip}`;
-                }
-            } catch (e) {
-                console.log("Status raw text:", message.payloadString);
-            }
+            } catch (e) { console.log("Status parse error"); }
         }
+    };
+
+    function onConnect() {
+        document.getElementById("mqtt-status").innerText = "🟢 Real-time MQTT Connected";
+        document.getElementById("mqtt-status").style.color = "#00adb5";
+        client.subscribe("mysolar_lk99/status");
     }
+
+    function onFailure(response) {
+        document.getElementById("mqtt-status").innerText = "🔴 MQTT Failed: " + response.errorMessage;
+        document.getElementById("mqtt-status").style.color = "#ff2e63";
+    }
+
+    client.connect({ onSuccess: onConnect, onFailure: onFailure, useSSL: true });
 
     function sendMQTT(topic, payload) {
         if (client.isConnected()) {
             const msg = new Paho.MQTT.Message(payload);
             msg.destinationName = topic;
             client.send(msg);
-        } else {
-            alert("MQTT not connected yet!");
-        }
+        } else { alert("MQTT not connected yet!"); }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 3. SMART CONFIGURATION SENDER LOGIC
+    // 5. SMART CONFIGURATION SENDER LOGIC
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     function saveSchedule(idx) {
         const payloadObj = { idx: idx };
-        
         const onInput = document.getElementById(`on_h_${idx}`).value;
         const offInput = document.getElementById(`off_h_${idx}`).value;
         const timerInput = document.getElementById(`timer_m_${idx}`).value;
@@ -307,57 +479,41 @@
         if (offInput !== "") payloadObj.off_h = parseInt(offInput);
         if (timerInput !== "") payloadObj.timer_m = parseInt(timerInput);
 
-        if (Object.keys(payloadObj).length === 1) {
-            alert("Please enter at least one value to update.");
-            return;
-        }
-
-        const payload = JSON.stringify(payloadObj);
-        sendMQTT("mysolar_lk99/schedule/set", payload);
+        if (Object.keys(payloadObj).length === 1) { alert("Please enter a value."); return; }
+        sendMQTT("mysolar_lk99/schedule/set", JSON.stringify(payloadObj));
         
-        // Clear inputs after sending
-        document.getElementById(`on_h_${idx}`).value = "";
-        document.getElementById(`off_h_${idx}`).value = "";
-        document.getElementById(`timer_m_${idx}`).value = "";
+        document.getElementById(`on_h_${idx}`).value = ""; document.getElementById(`off_h_${idx}`).value = ""; document.getElementById(`timer_m_${idx}`).value = "";
     }
 
     function updateConfig() {
         const payloadObj = {};
-        
         const cebOn = document.getElementById("ceb_on").value;
         const cebOff = document.getElementById("ceb_off").value;
-        const alV = document.getElementById("al_v").value;
-        const alStrobe = document.getElementById("al_strobe").value;
+        const ahReset = document.getElementById("ah_reset").value;
 
         if (cebOn !== "") payloadObj.ceb_on = parseFloat(cebOn);
         if (cebOff !== "") payloadObj.ceb_off = parseFloat(cebOff);
-        if (alV !== "") payloadObj.al_v = parseFloat(alV);
-        if (alStrobe !== "") payloadObj.al_strobe = parseInt(alStrobe);
+        if (ahReset !== "") payloadObj.ah_reset = parseInt(ahReset);
 
-        if (Object.keys(payloadObj).length === 0) {
-            alert("Please enter at least one setting to update.");
-            return;
-        }
-
-        const payload = JSON.stringify(payloadObj);
-        sendMQTT("mysolar_lk99/config/set", payload);
+        if (Object.keys(payloadObj).length === 0) { alert("Please enter at least one setting to update."); return; }
         
-        // Clear inputs after sending
-        document.getElementById("ceb_on").value = "";
-        document.getElementById("ceb_off").value = "";
-        document.getElementById("al_v").value = "";
-        document.getElementById("al_strobe").value = "";
+        sendMQTT("mysolar_lk99/config/set", JSON.stringify(payloadObj));
+        
+        document.getElementById("ceb_on").value = ""; document.getElementById("ceb_off").value = ""; document.getElementById("ah_reset").value = "";
     }
 
     function calibrateINA() {
         const real_c = parseFloat(document.getElementById("real_c").value);
-        if (!real_c || real_c <= 0) { alert("Enter valid current in Amperes"); return; }
-        const payload = JSON.stringify({ real_c });
-        sendMQTT("mysolar_lk99/calibrate/ina", payload);
-        
+        if (!real_c || real_c <= 0) { alert("Enter valid Amperes"); return; }
+        sendMQTT("mysolar_lk99/calibrate/ina", JSON.stringify({ real_c }));
         document.getElementById("real_c").value = "";
     }
-</script>
 
+    // INITIAL LOADS & INTERVALS
+    fetchCoreTelemetry(); fetchLogs(); fetchForecastData(); fetchDailyHealthStats();
+    setInterval(() => { fetchCoreTelemetry(); fetchForecastData(); fetchDailyHealthStats(); }, 15000);
+    setInterval(fetchLogs, 5000);
+
+</script>
 </body>
 </html>
