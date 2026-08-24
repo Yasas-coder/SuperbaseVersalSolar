@@ -22,7 +22,7 @@
             --subtext-color: #aaa;
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
-        .container { max-width: 1100px; margin: 0 auto; }
+        .container { max-width: 1200px; margin: 0 auto; }
         h1, h2, h3 { color: var(--accent-color); margin-bottom: 10px; }
         .status-bar { text-align: center; padding: 10px; margin-bottom: 20px; border-radius: 6px; font-weight: bold; background: #222; }
         .card { background-color: var(--card-bg); border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); }
@@ -117,6 +117,11 @@
                 <div class="value" id="val-ah-out" style="color: var(--alert-color);">-- <span class="unit">Ah</span></div>
                 <div class="status-text">Since configured reset hour</div>
             </div>
+            <div class="metric-box soc-highlight">
+                <div class="label">Today's Max SOC</div>
+                <div class="value" id="val-max-soc" style="color: var(--soc-color);">-- <span class="unit">%</span></div>
+                <div class="status-text" id="time-max-soc">Time: --:--</div>
+            </div>
             <div class="metric-box highlight">
                 <div class="label">Today's Peak Voltage</div>
                 <div class="value" id="val-max-v">-- <span class="unit">V</span></div>
@@ -127,11 +132,6 @@
                 <div class="value" id="val-min-v">-- <span class="unit">V</span></div>
                 <div class="status-text" id="time-min-v">Time: --:--</div>
             </div>
-            <div class="metric-box soc-highlight">
-                <div class="label">Today's Max SOC</div>
-                <div class="value" id="val-max-soc" style="color: var(--soc-color);">-- <span class="unit">%</span></div>
-                <div class="status-text" id="time-max-soc">Time: --:--</div>
-            </div>
             <div class="metric-box soc-highlight" style="border-left-color: var(--alert-color);">
                 <div class="label">Today's Min SOC</div>
                 <div class="value" id="val-min-soc" style="color: var(--alert-color);">-- <span class="unit">%</span></div>
@@ -140,13 +140,37 @@
         </div>
     </div>
 
-    <!-- Live Supabase Graphs -->
+    <!-- MULTI-GRAPH LIVE TELEMETRY -->
     <h2>📊 Live Telemetry Trends</h2>
     <div class="grid">
         <div class="card">
-            <h3>Battery Bus Potential (V)</h3>
+            <h3>Battery Voltage (V)</h3>
             <div style="position: relative; height: 250px; width: 100%;">
                 <canvas id="batteryChart"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <h3>Battery Current (A)</h3>
+            <div style="position: relative; height: 250px; width: 100%;">
+                <canvas id="currentChart"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <h3>State of Charge (%)</h3>
+            <div style="position: relative; height: 250px; width: 100%;">
+                <canvas id="socChart"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <h3>Charged Today (Ah)</h3>
+            <div style="position: relative; height: 250px; width: 100%;">
+                <canvas id="ahInChart"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <h3>Discharged Today (Ah)</h3>
+            <div style="position: relative; height: 250px; width: 100%;">
+                <canvas id="ahOutChart"></canvas>
             </div>
         </div>
         <div class="card">
@@ -258,8 +282,14 @@
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpud3V5dW53dHd1cnJlam93a2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzI1MzYsImV4cCI6MjEwMTM0ODUzNn0.K5M2TbML6mWuE6O5uLkIsMIaaun1hmAl8EJeVlsoKrI";
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // Chart Instances
     let batteryChartInstance = null;
+    let currentChartInstance = null;
+    let socChartInstance = null;
+    let ahInChartInstance = null;
+    let ahOutChartInstance = null;
     let loadChartInstance = null;
+    
     let currentSettings = { last_billing_date: new Date().toISOString().split('T')[0], cycle_days: 30, energy_offset: 0.0 };
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -279,7 +309,7 @@
                 ipLink.href = `http://${data[0].local_ip}`;
             }
 
-            // Render Ah In / Ah Out
+            // Render Ah In / Ah Out Top Boxes
             if (data[0].ah_charged !== undefined && data[0].ah_charged !== null) {
                 document.getElementById('val-ah-in').innerHTML = `${data[0].ah_charged.toFixed(2)} <span class="unit">Ah</span>`;
             }
@@ -287,14 +317,25 @@
                 document.getElementById('val-ah-out').innerHTML = `${data[0].ah_discharged.toFixed(2)} <span class="unit">Ah</span>`;
             }
 
-            // Build Charts
+            // Reverse for charting left-to-right
             data.reverse();
             const timestamps = data.map(row => new Date(row.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+            
+            // Map Variables
             const batteryV = data.map(row => row.battery_v);
+            const batteryA = data.map(row => row.battery_a);
+            const socData = data.map(row => row.soc);
+            const ahIn = data.map(row => row.ah_charged || 0);
+            const ahOut = data.map(row => row.ah_discharged || 0);
             const loadW = data.map(row => row.load_w);
 
-            batteryChartInstance = renderChart('batteryChart', batteryChartInstance, timestamps, batteryV, 'Battery V', '#00adb5');
-            loadChartInstance = renderChart('loadChart', loadChartInstance, timestamps, loadW, 'Load (W)', '#ff2e63');
+            // Render All 6 Charts
+            batteryChartInstance = renderChart('batteryChart', batteryChartInstance, timestamps, batteryV, 'Voltage (V)', '#00adb5');
+            currentChartInstance = renderChart('currentChart', currentChartInstance, timestamps, batteryA, 'Current (A)', '#ff9f43');
+            socChartInstance = renderChart('socChart', socChartInstance, timestamps, socData, 'SOC (%)', '#4cd137');
+            ahInChartInstance = renderChart('ahInChart', ahInChartInstance, timestamps, ahIn, 'Charged (Ah)', '#00adb5');
+            ahOutChartInstance = renderChart('ahOutChart', ahOutChartInstance, timestamps, ahOut, 'Discharged (Ah)', '#ff2e63');
+            loadChartInstance = renderChart('loadChart', loadChartInstance, timestamps, loadW, 'AC Load (W)', '#ff2e63');
 
         } catch (err) { console.error("Telemetry Error:", err); }
     }
