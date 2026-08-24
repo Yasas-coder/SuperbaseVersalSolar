@@ -63,13 +63,11 @@
 <div class="container">
     <h1 style="text-align: center;">☀️ Solar Infrastructure Cloud OS</h1>
     
-    <div id="mqtt-status" class="status-bar" style="color: #ff9f43;">🔌 Connecting to MQTT Broker...</div>
-
-    <!-- System Info Bar -->
-    <div class="card" style="text-align: center;">
-        <p style="margin: 0; font-size: 1.1em;">
-            🌐 <b>ESP32 Local IP:</b> <a id="local-ip-link" href="#" target="_blank" style="color: var(--accent-color); text-decoration: none; font-weight: bold;">Fetching...</a>
-        </p>
+    <!-- Subtle System Info Bar -->
+    <div style="text-align: center; font-size: 0.75em; color: var(--subtext-color); margin-top: -5px; margin-bottom: 25px; opacity: 0.7;">
+        <span id="mqtt-status" style="color: #ff9f43;">🔌 Connecting to MQTT...</span> 
+        &nbsp; | &nbsp; 
+        <span>🌐 Local IP: <a id="local-ip-link" href="#" target="_blank" style="color: var(--subtext-color); text-decoration: none;">Fetching...</a></span>
     </div>
 
     <!-- MAIN FORECAST CARD -->
