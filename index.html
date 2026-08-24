@@ -22,7 +22,7 @@
             --subtext-color: #aaa;
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; }
+        .container { max-width: 1100px; margin: 0 auto; }
         h1, h2, h3 { color: var(--accent-color); margin-bottom: 10px; }
         .status-bar { text-align: center; padding: 10px; margin-bottom: 20px; border-radius: 6px; font-weight: bold; background: #222; }
         .card { background-color: var(--card-bg); border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); }
@@ -249,6 +249,15 @@
         </div>
 
         <div class="card">
+            <h3>🚨 Alarm & Strobe Limits</h3>
+            <label>Critical Alarm Trigger (V):</label>
+            <input type="number" step="0.1" id="al_v" placeholder="e.g. 10.5">
+            <label>Strobe Flashing Rate (Sec):</label>
+            <input type="number" id="al_strobe" placeholder="e.g. 4">
+            <button class="off" style="width:100%; margin-top:8px;" onclick="updateConfig()">Push Alarm Settings</button>
+        </div>
+
+        <div class="card">
             <h3>⚙️ Forecast Settings</h3>
             <form id="settings-form">
                 <label>Last Billing Date</label>
@@ -260,6 +269,24 @@
                 <button type="submit" class="action" style="width:100%; margin-top:8px;">Save Cloud Forecast Settings</button>
                 <span id="save-status" class="status-text" style="display:block; text-align:center;"></span>
             </form>
+        </div>
+
+        <!-- RESTORED: DATA EXPORTER -->
+        <div class="card">
+            <h3>💾 Database Exporter</h3>
+            <div class="form-group">
+                <label for="export_start">Start Date</label>
+                <input type="date" id="export_start" required>
+            </div>
+            <div class="form-group">
+                <label for="export_end">End Date</label>
+                <input type="date" id="export_end" required>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button onclick="exportToCSV('solar_telemetry')" style="background-color: #00adb5;">📥 Telemetry</button>
+                <button onclick="exportToCSV('system_logs')" style="background-color: #ff9f43;">📥 Logs</button>
+            </div>
+            <span id="export-status" class="status-text" style="display: block; margin-top: 10px;"></span>
         </div>
 
         <div class="card">
@@ -469,7 +496,82 @@
     });
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 4. MQTT WEBSOCKET REAL-TIME ENGINE
+    // 4. DATA EXPORT FUNCTION
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    async function exportToCSV(tableName) {
+        const startInput = document.getElementById('export_start').value;
+        const endInput = document.getElementById('export_end').value;
+        const statusEl = document.getElementById('export-status');
+
+        if (!startInput || !endInput) {
+            statusEl.innerText = "⚠️ Please select both a Start Date and End Date.";
+            statusEl.style.color = "var(--alert-color)";
+            return;
+        }
+
+        statusEl.innerText = `Fetching records from ${tableName}... Please wait.`;
+        statusEl.style.color = "var(--warning-color)";
+
+        let allData = [];
+        let from = 0;
+        let step = 999;
+        let hasMore = true;
+
+        try {
+            while (hasMore) {
+                const { data, error } = await _supabase
+                    .from(tableName)
+                    .select('*')
+                    .gte('created_at', `${startInput}T00:00:00.000Z`)
+                    .lte('created_at', `${endInput}T23:59:59.999Z`)
+                    .order('created_at', { ascending: true })
+                    .range(from, from + step);
+
+                if (error) throw error;
+                if (data.length > 0) { allData = allData.concat(data); from += step + 1; }
+                if (data.length <= step) { hasMore = false; }
+            }
+
+            if (allData.length === 0) {
+                statusEl.innerText = "No data found for this date range.";
+                statusEl.style.color = "var(--alert-color)";
+                return;
+            }
+
+            const headers = Object.keys(allData[0]);
+            const csvRows = [];
+            csvRows.push(headers.join(','));
+
+            for (const row of allData) {
+                const values = headers.map(header => {
+                    const val = row[header] !== null ? row[header] : '';
+                    const escaped = ('' + val).replace(/"/g, '""'); 
+                    return `"${escaped}"`;
+                });
+                csvRows.push(values.join(','));
+            }
+
+            const csvString = csvRows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Solar_${tableName}_${startInput}_to_${endInput}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            statusEl.innerText = `✅ Successfully downloaded ${allData.length} rows!`;
+            statusEl.style.color = "var(--accent-color)";
+        } catch (err) {
+            console.error("Export Error:", err);
+            statusEl.innerText = "Error exporting data. Check console.";
+            statusEl.style.color = "var(--alert-color)";
+        }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 5. MQTT WEBSOCKET REAL-TIME ENGINE
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const mqttBroker = "broker.hivemq.com";
     const mqttPort = 8884;
@@ -498,6 +600,11 @@
                         }
                     });
                 }
+                
+                // Update placeholders with active values from the ESP32
+                if (status.ceb_on !== undefined) document.getElementById('ceb_on').placeholder = `Current: ${status.ceb_on}%`;
+                if (status.ceb_off !== undefined) document.getElementById('ceb_off').placeholder = `Current: ${status.ceb_off}%`;
+                if (status.al_v !== undefined) document.getElementById('al_v').placeholder = `Current: ${status.al_v}V`;
             } catch (e) { console.log("Status parse error"); }
         }
     };
@@ -524,7 +631,7 @@
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 5. SMART CONFIGURATION SENDER LOGIC
+    // 6. SMART CONFIGURATION SENDER LOGIC
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     function saveSchedule(idx) {
         const payloadObj = { idx: idx };
@@ -547,16 +654,24 @@
         const cebOn = document.getElementById("ceb_on").value;
         const cebOff = document.getElementById("ceb_off").value;
         const ahReset = document.getElementById("ah_reset").value;
+        const alV = document.getElementById("al_v").value;
+        const alStrobe = document.getElementById("al_strobe").value;
 
         if (cebOn !== "") payloadObj.ceb_on = parseFloat(cebOn);
         if (cebOff !== "") payloadObj.ceb_off = parseFloat(cebOff);
         if (ahReset !== "") payloadObj.ah_reset = parseInt(ahReset);
+        if (alV !== "") payloadObj.al_v = parseFloat(alV);
+        if (alStrobe !== "") payloadObj.al_strobe = parseInt(alStrobe);
 
         if (Object.keys(payloadObj).length === 0) { alert("Please enter at least one setting to update."); return; }
         
         sendMQTT("mysolar_lk99/config/set", JSON.stringify(payloadObj));
         
-        document.getElementById("ceb_on").value = ""; document.getElementById("ceb_off").value = ""; document.getElementById("ah_reset").value = "";
+        document.getElementById("ceb_on").value = ""; 
+        document.getElementById("ceb_off").value = ""; 
+        document.getElementById("ah_reset").value = "";
+        document.getElementById("al_v").value = "";
+        document.getElementById("al_strobe").value = "";
     }
 
     function calibrateINA() {
