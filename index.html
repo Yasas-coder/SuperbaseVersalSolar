@@ -28,6 +28,7 @@
         .card { background-color: var(--card-bg); border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
         .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-top: 15px; }
         
         .metric-box { background-color: #252525; padding: 15px; border-radius: 6px; border-left: 4px solid var(--accent-color); }
         .metric-box.highlight { border-left-color: var(--warning-color); }
@@ -101,34 +102,63 @@
         </div>
     </div>
 
-    <!-- DAILY VOLTAGE & SOC HEALTH CARD -->
+    <!-- BLOCK 1: AMP-HOURS & RUNTIME -->
     <div class="card">
-        <h3>☀️ Daily Battery Health & Solar Peak</h3>
-        <div class="grid-3">
+        <h3>🔋 Battery Capacity & Runtime</h3>
+        <div class="grid-4">
             <div class="metric-box">
-                <div class="label">Charged Today (Solar)</div>
+                <div class="label">Charged Today</div>
                 <div class="value" id="val-ah-in" style="color: var(--accent-color);">-- <span class="unit">Ah</span></div>
-                <div class="status-text">Since configured reset hour</div>
             </div>
             <div class="metric-box">
-                <div class="label">Discharged Today (Load)</div>
+                <div class="label">Discharged Today</div>
                 <div class="value" id="val-ah-out" style="color: var(--alert-color);">-- <span class="unit">Ah</span></div>
-                <div class="status-text">Since configured reset hour</div>
             </div>
             <div class="metric-box soc-highlight">
-                <div class="label">Today's Max SOC</div>
-                <div class="value" id="val-max-soc" style="color: var(--soc-color);">-- <span class="unit">%</span></div>
-                <div class="status-text" id="time-max-soc">Time: --:--</div>
+                <div class="label">Remaining Juice</div>
+                <div class="value" id="val-ah-remain">-- <span class="unit">Ah</span></div>
+            </div>
+            <div class="metric-box highlight">
+                <div class="label">Est. Time Remaining</div>
+                <div class="value" id="val-time-remain" style="color: var(--warning-color);">--</div>
+                <div class="status-text" id="status-time-remain">Averaging load...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BLOCK 2: VOLTAGE HEALTH -->
+    <div class="card">
+        <h3>⚡ Voltage Health</h3>
+        <div class="grid-3">
+            <div class="metric-box highlight">
+                <div class="label">Current Live Voltage</div>
+                <div class="value" id="val-live-v">-- <span class="unit">V</span></div>
             </div>
             <div class="metric-box highlight">
                 <div class="label">Today's Peak Voltage</div>
                 <div class="value" id="val-max-v">-- <span class="unit">V</span></div>
                 <div class="status-text" id="time-max-v">Time: --:--</div>
             </div>
-            <div class="metric-box highlight">
+            <div class="metric-box highlight" style="border-left-color: var(--alert-color);">
                 <div class="label">Today's Lowest Voltage</div>
-                <div class="value" id="val-min-v">-- <span class="unit">V</span></div>
+                <div class="value" id="val-min-v" style="color: var(--alert-color);">-- <span class="unit">V</span></div>
                 <div class="status-text" id="time-min-v">Time: --:--</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BLOCK 3: STATE OF CHARGE (SOC) -->
+    <div class="card">
+        <h3>📊 State of Charge (SOC)</h3>
+        <div class="grid-3">
+            <div class="metric-box soc-highlight">
+                <div class="label">Current Live SOC</div>
+                <div class="value" id="val-live-soc">-- <span class="unit">%</span></div>
+            </div>
+            <div class="metric-box soc-highlight">
+                <div class="label">Today's Max SOC</div>
+                <div class="value" id="val-max-soc" style="color: var(--soc-color);">-- <span class="unit">%</span></div>
+                <div class="status-text" id="time-max-soc">Time: --:--</div>
             </div>
             <div class="metric-box soc-highlight" style="border-left-color: var(--alert-color);">
                 <div class="label">Today's Min SOC</div>
@@ -139,7 +169,7 @@
     </div>
 
     <!-- MULTI-GRAPH LIVE TELEMETRY -->
-    <h2>📊 Live Telemetry Trends</h2>
+    <h2>📈 Live Telemetry Trends</h2>
     <div class="grid">
         <div class="card">
             <h3>Battery Voltage (V)</h3>
@@ -269,7 +299,6 @@
             </form>
         </div>
 
-        <!-- RESTORED: DATA EXPORTER -->
         <div class="card">
             <h3>💾 Database Exporter</h3>
             <div class="form-group">
@@ -292,8 +321,17 @@
             <label>Measured Current (A):</label>
             <input type="number" step="0.001" id="real_c" placeholder="e.g. 5.230">
             <button class="auto" style="width:100%; margin-top:8px;" onclick="calibrateINA()">Calibrate INA226</button>
+            
             <hr style="border-color:#333; margin:15px 0;">
-            <button class="danger" style="width:100%;" onclick="if(confirm('Execute Remote ESP32 Reboot?')) sendMQTT('mysolar_lk99/system/command', 'REBOOT')">⚠️ Remote System Reboot</button>
+            <label>Force Manual SOC (%):</label>
+            <input type="number" step="0.1" id="force_soc" placeholder="e.g. 50.0">
+            <button class="timer" style="width:100%; margin-top:8px;" onclick="forceSOC()">Inject SOC to ESP32</button>
+            
+            <hr style="border-color:#333; margin:15px 0;">
+            <div style="display: flex; gap: 10px;">
+                <button class="on" style="background:#ff9f43;" onclick="if(confirm('Wipe Ah counters back to 0 immediately?')) sendMQTT('mysolar_lk99/system/command', 'RESET_AH')">🔄 Reset AH Now</button>
+                <button class="danger" onclick="if(confirm('Execute Remote ESP32 Reboot?')) sendMQTT('mysolar_lk99/system/command', 'REBOOT')">⚠️ Reboot Device</button>
+            </div>
         </div>
         
     </div>
@@ -307,6 +345,9 @@
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpud3V5dW53dHd1cnJlam93a2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzI1MzYsImV4cCI6MjEwMTM0ODUzNn0.K5M2TbML6mWuE6O5uLkIsMIaaun1hmAl8EJeVlsoKrI";
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // Hardcoded from ESP32 code for runtime calculation
+    const BATTERY_CAPACITY_AH = 52.0;
+
     // Chart Instances
     let batteryChartInstance = null;
     let currentChartInstance = null;
@@ -314,7 +355,6 @@
     let ahInChartInstance = null;
     let ahOutChartInstance = null;
     let loadChartInstance = null;
-    
     let currentSettings = { last_billing_date: new Date().toISOString().split('T')[0], cycle_days: 30, energy_offset: 0.0 };
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -322,31 +362,70 @@
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     async function fetchCoreTelemetry() {
         try {
-            // Fetch latest 30 points for Charts
             const { data, error } = await _supabase.from('solar_telemetry').select('*').order('created_at', { ascending: false }).limit(30);
             if (error) throw error;
             if (!data || data.length === 0) return;
 
-            // IP Update
-            if (data[0].local_ip) {
+            const latest = data[0];
+
+            if (latest.local_ip) {
                 const ipLink = document.getElementById("local-ip-link");
-                ipLink.innerText = data[0].local_ip;
-                ipLink.href = `http://${data[0].local_ip}`;
+                ipLink.innerText = latest.local_ip;
+                ipLink.href = `http://${latest.local_ip}`;
             }
 
-            // Render Ah In / Ah Out Top Boxes
-            if (data[0].ah_charged !== undefined && data[0].ah_charged !== null) {
-                document.getElementById('val-ah-in').innerHTML = `${data[0].ah_charged.toFixed(2)} <span class="unit">Ah</span>`;
+            // --- POPULATE LIVE METRICS ---
+            if (latest.soc !== undefined) document.getElementById('val-live-soc').innerHTML = `${latest.soc.toFixed(1)} <span class="unit">%</span>`;
+            if (latest.battery_v !== undefined) document.getElementById('val-live-v').innerHTML = `${latest.battery_v.toFixed(2)} <span class="unit">V</span>`;
+
+            // --- CAPACITY & RUNTIME CALCULATIONS ---
+            if (latest.ah_charged !== undefined && latest.ah_charged !== null) {
+                document.getElementById('val-ah-in').innerHTML = `${latest.ah_charged.toFixed(2)} <span class="unit">Ah</span>`;
             }
-            if (data[0].ah_discharged !== undefined && data[0].ah_discharged !== null) {
-                document.getElementById('val-ah-out').innerHTML = `${data[0].ah_discharged.toFixed(2)} <span class="unit">Ah</span>`;
+            if (latest.ah_discharged !== undefined && latest.ah_discharged !== null) {
+                document.getElementById('val-ah-out').innerHTML = `${latest.ah_discharged.toFixed(2)} <span class="unit">Ah</span>`;
             }
 
-            // Reverse for charting left-to-right
+            let remainingAh = 0;
+            if (latest.soc !== undefined) {
+                remainingAh = (latest.soc / 100.0) * BATTERY_CAPACITY_AH;
+                document.getElementById('val-ah-remain').innerHTML = `${remainingAh.toFixed(2)} <span class="unit">Ah</span>`;
+            }
+
+            // Average the last ~2 minutes (4 points of 30sec intervals) for stable Time Remaining
+            let avgAmps = 0;
+            let count = Math.min(data.length, 4);
+            for(let i=0; i<count; i++) { avgAmps += data[i].battery_a; }
+            avgAmps = avgAmps / count;
+
+            const timeBox = document.getElementById('val-time-remain');
+            const timeStatus = document.getElementById('status-time-remain');
+
+            if (avgAmps < -0.1) {
+                // Discharging -> Calculate Time to Empty
+                let hrs = remainingAh / Math.abs(avgAmps);
+                let h = Math.floor(hrs);
+                let m = Math.round((hrs - h) * 60);
+                timeBox.innerHTML = `${h}h ${m}m`;
+                timeBox.style.color = "var(--alert-color)";
+                timeStatus.innerText = `Draining at ${Math.abs(avgAmps).toFixed(2)}A avg`;
+            } else if (avgAmps > 0.1) {
+                // Charging -> Calculate Time to 100% Full
+                let hrsToFull = (BATTERY_CAPACITY_AH - remainingAh) / avgAmps;
+                let h = Math.floor(hrsToFull);
+                let m = Math.round((hrsToFull - h) * 60);
+                timeBox.innerHTML = `${h}h ${m}m`;
+                timeBox.style.color = "var(--soc-color)";
+                timeStatus.innerText = `Charging at ${avgAmps.toFixed(2)}A avg`;
+            } else {
+                timeBox.innerHTML = `Idle`;
+                timeBox.style.color = "var(--text-color)";
+                timeStatus.innerText = `Current load is negligible`;
+            }
+
+            // Reverse data arrays for chart rendering (left to right)
             data.reverse();
             const timestamps = data.map(row => new Date(row.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
-            
-            // Map Variables
             const batteryV = data.map(row => row.battery_v);
             const batteryA = data.map(row => row.battery_a);
             const socData = data.map(row => row.soc);
@@ -354,7 +433,6 @@
             const ahOut = data.map(row => row.ah_discharged || 0);
             const loadW = data.map(row => row.load_w);
 
-            // Render All 6 Charts
             batteryChartInstance = renderChart('batteryChart', batteryChartInstance, timestamps, batteryV, 'Voltage (V)', '#00adb5');
             currentChartInstance = renderChart('currentChart', currentChartInstance, timestamps, batteryA, 'Current (A)', '#ff9f43');
             socChartInstance = renderChart('socChart', socChartInstance, timestamps, socData, 'SOC (%)', '#4cd137');
@@ -602,7 +680,9 @@
                 // Update placeholders with active values from the ESP32
                 if (status.ceb_on !== undefined) document.getElementById('ceb_on').placeholder = `Current: ${status.ceb_on}%`;
                 if (status.ceb_off !== undefined) document.getElementById('ceb_off').placeholder = `Current: ${status.ceb_off}%`;
+                if (status.ah_reset !== undefined) document.getElementById('ah_reset').placeholder = `Current: ${status.ah_reset}`;
                 if (status.al_v !== undefined) document.getElementById('al_v').placeholder = `Current: ${status.al_v}V`;
+                if (status.al_strobe !== undefined) document.getElementById('al_strobe').placeholder = `Current: ${status.al_strobe}s`;
             } catch (e) { console.log("Status parse error"); }
         }
     };
@@ -677,6 +757,13 @@
         if (!real_c || real_c <= 0) { alert("Enter valid Amperes"); return; }
         sendMQTT("mysolar_lk99/calibrate/ina", JSON.stringify({ real_c }));
         document.getElementById("real_c").value = "";
+    }
+
+    function forceSOC() {
+        const overrideSoc = parseFloat(document.getElementById("force_soc").value);
+        if (isNaN(overrideSoc) || overrideSoc < 0 || overrideSoc > 100) { alert("Enter a valid SOC between 0 and 100"); return; }
+        sendMQTT("mysolar_lk99/system/command", `SET_SOC_${overrideSoc}`);
+        document.getElementById("force_soc").value = "";
     }
 
     // INITIAL LOADS & INTERVALS
