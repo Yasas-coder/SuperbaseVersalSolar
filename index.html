@@ -1,3 +1,5 @@
+Here is the updated Vercel index.html.
+The Battery Capacity & Runtime card now calculates both the duration left (e.g. 4h 12m) and the exact clock time the battery will run out or finish charging (e.g. Lasts until: 02:45 AM or Full by: 11:30 AM).
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -119,8 +121,9 @@
                 <div class="value" id="val-ah-remain">-- <span class="unit">Ah</span></div>
             </div>
             <div class="metric-box highlight">
-                <div class="label">Est. Time Remaining</div>
+                <div class="label">Est. Runtime / Full Target</div>
                 <div class="value" id="val-time-remain" style="color: var(--warning-color);">--</div>
+                <div class="status-text" id="target-finish-time" style="font-weight: bold; color: var(--text-color);">--</div>
                 <div class="status-text" id="status-time-remain">Averaging load...</div>
             </div>
         </div>
@@ -345,7 +348,6 @@
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpud3V5dW53dHd1cnJlam93a2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NzI1MzYsImV4cCI6MjEwMTM0ODUzNn0.K5M2TbML6mWuE6O5uLkIsMIaaun1hmAl8EJeVlsoKrI";
     const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Hardcoded from ESP32 code for runtime calculation
     const BATTERY_CAPACITY_AH = 52.0;
 
     // Chart Instances
@@ -399,6 +401,7 @@
             avgAmps = avgAmps / count;
 
             const timeBox = document.getElementById('val-time-remain');
+            const targetTimeEl = document.getElementById('target-finish-time');
             const timeStatus = document.getElementById('status-time-remain');
 
             if (avgAmps < -0.1) {
@@ -408,6 +411,16 @@
                 let m = Math.round((hrs - h) * 60);
                 timeBox.innerHTML = `${h}h ${m}m`;
                 timeBox.style.color = "var(--alert-color)";
+
+                // Calculate target time of battery depletion
+                let finishTime = new Date(Date.now() + (hrs * 3600 * 1000));
+                let options = { hour: '2-digit', minute: '2-digit' };
+                if (hrs >= 24) {
+                    options.weekday = 'short';
+                }
+                targetTimeEl.innerText = `Lasts until: ${finishTime.toLocaleTimeString([], options)}`;
+                targetTimeEl.style.color = "var(--warning-color)";
+
                 timeStatus.innerText = `Draining at ${Math.abs(avgAmps).toFixed(2)}A avg`;
             } else if (avgAmps > 0.1) {
                 // Charging -> Calculate Time to 100% Full
@@ -416,10 +429,22 @@
                 let m = Math.round((hrsToFull - h) * 60);
                 timeBox.innerHTML = `${h}h ${m}m`;
                 timeBox.style.color = "var(--soc-color)";
+
+                // Calculate target time of full charge
+                let finishTime = new Date(Date.now() + (hrsToFull * 3600 * 1000));
+                let options = { hour: '2-digit', minute: '2-digit' };
+                if (hrsToFull >= 24) {
+                    options.weekday = 'short';
+                }
+                targetTimeEl.innerText = `Full by: ${finishTime.toLocaleTimeString([], options)}`;
+                targetTimeEl.style.color = "var(--soc-color)";
+
                 timeStatus.innerText = `Charging at ${avgAmps.toFixed(2)}A avg`;
             } else {
                 timeBox.innerHTML = `Idle`;
                 timeBox.style.color = "var(--text-color)";
+                targetTimeEl.innerText = `Stable state`;
+                targetTimeEl.style.color = "var(--subtext-color)";
                 timeStatus.innerText = `Current load is negligible`;
             }
 
@@ -774,3 +799,4 @@
 </script>
 </body>
 </html>
+
