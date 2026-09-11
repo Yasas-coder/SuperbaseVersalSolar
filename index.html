@@ -2,306 +2,79 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <!-- Native App Meta Tags -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#121212">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Cloud OS</title>
     
-    <title>Smart Control</title>
-    
-    <!-- Paho MQTT Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+    <!-- Supabase, Chart.js, and Paho MQTT -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
     
     <style>
         :root {
             --bg-color: #121212;
             --card-bg: #1e1e1e;
-            --sub-card: #282828;
-            --text-main: #ffffff;
-            --text-muted: #aaa;
-            --accent-on: #00e676;
-            --accent-off: #ff2e63;
-            --accent-auto: #00adb5;
-            --accent-timer: #9c27b0;
-            --accent-dimmer: #f1c40f;
+            --accent-color: #00adb5;
             --warning-color: #ff9f43;
             --alert-color: #ff2e63;
             --soc-color: #4cd137;
+            --text-color: #e0e0e0;
+            --subtext-color: #aaa;
         }
-        
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            margin: 0;
-            padding: 20px 15px 60px 15px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .header {
-            width: 100%;
-            max-width: 1100px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-        }
-        
-        .header h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 0.5px; color: var(--accent-auto); }
-        
-        .status-dot {
-            width: 12px; height: 12px; border-radius: 50%;
-            background-color: #ff9f43;
-            box-shadow: 0 0 8px rgba(255, 159, 67, 0.6);
-            transition: background-color 0.3s;
-        }
-
-        .container { max-width: 1100px; margin: 0 auto; width: 100%; }
-        h2, h3 { color: var(--accent-auto); margin-bottom: 10px; }
-        .card { background-color: var(--card-bg); border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); border: 1px solid #2a2a2a; }
-        
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        h1, h2, h3 { color: var(--accent-color); margin-bottom: 10px; }
+        .status-bar { text-align: center; padding: 10px; margin-bottom: 20px; border-radius: 6px; font-weight: bold; background: #222; }
+        .card { background-color: var(--card-bg); border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
         .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
         .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-top: 15px; }
         
-        .metric-box { background-color: #252525; padding: 15px; border-radius: 6px; border-left: 4px solid var(--accent-auto); }
+        .metric-box { background-color: #252525; padding: 15px; border-radius: 6px; border-left: 4px solid var(--accent-color); }
         .metric-box.highlight { border-left-color: var(--warning-color); }
         .metric-box.soc-highlight { border-left-color: var(--soc-color); }
-        .metric-box .label { font-size: 0.85em; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-box .label { font-size: 0.85em; color: var(--subtext-color); text-transform: uppercase; letter-spacing: 0.5px; }
         .metric-box .value { font-size: 1.8em; font-weight: bold; margin-top: 5px; }
-        .unit { font-size: 0.5em; color: var(--text-muted); }
-
-        /* --- PRIMARY & SECONDARY CARDS --- */
-        .primary-card { background-color: var(--card-bg); width: 100%; max-width: 400px; border-radius: 24px; padding: 24px; margin: 0 auto 40px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #2a2a2a; }
-        .secondary-card { background-color: #181818; width: 100%; max-width: 400px; border-radius: 20px; padding: 20px; margin: 0 auto 15px auto; border: 1px solid #222; }
+        .unit { font-size: 0.5em; color: var(--subtext-color); }
         
-        .section-title { width: 100%; max-width: 400px; font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin: 0 auto 12px auto; padding-left: 10px; }
-
-        .device-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
-        .device-title { display: flex; align-items: center; gap: 12px; }
-        .device-title span { font-size: 28px; }
-        .device-title h2 { margin: 0; font-size: 20px; font-weight: 600; color: var(--text-main); }
-        .secondary-card .device-title h2 { font-size: 17px; }
-        
-        .state-badge {
-            font-size: 11px; font-weight: 800; padding: 6px 12px;
-            border-radius: 20px; background: #2a2a2a; color: var(--text-muted);
-            text-transform: uppercase; letter-spacing: 1px;
-            border: 1px solid #333;
-        }
-
-        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .controls.three-col { grid-template-columns: 1fr 1fr 1fr; }
-
-        button { border: none; border-radius: 14px; padding: 15px 0; font-size: 15px; font-weight: 700; color: white; cursor: pointer; transition: transform 0.1s, filter 0.2s; background: #333; }
-        button:active { transform: scale(0.96); }
-        button:hover { filter: brightness(1.1); }
-        .btn-on { background-color: var(--accent-on); color: #000; font-weight: 800; }
-        .btn-off { background-color: var(--accent-off); font-weight: 800; }
-        .btn-auto { background-color: var(--accent-auto); color: #000; font-weight: 800; }
-        .action { background-color: var(--accent-auto); width: 100%; border-radius: 5px; }
-        .danger { background-color: #d32f2f; width: 100%; border-radius: 5px; }
-
-        /* --- TIMERS & SLIDERS --- */
-        .timer-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid #2e2e2e; }
-        .timer-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
-        .preset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 15px; }
-        .preset-btn { background-color: var(--sub-card); border: 1px solid #383838; border-radius: 12px; padding: 12px 0; font-size: 14px; font-weight: 700; color: #ddd; }
-        .preset-btn:active { background-color: var(--accent-timer); color: #fff; }
-
-        .slider-container { background: var(--sub-card); border: 1px solid #383838; border-radius: 14px; padding: 15px; margin-bottom: 12px; }
-        .slider-header { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; margin-bottom: 15px; color: #ccc; }
-        .slider-display { color: var(--accent-timer); font-size: 15px; }
-        .dimmer-display { color: var(--accent-dimmer); font-size: 15px; font-weight: bold; }
-        .slider-row { display: flex; align-items: center; gap: 15px; }
-
-        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; flex: 1; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: var(--accent-timer); cursor: pointer; margin-top: -9px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
-        input[type=range].dimmer-track::-webkit-slider-thumb { background: var(--accent-dimmer); }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #444; border-radius: 4px; }
-
-        .btn-set-action { border-radius: 10px; padding: 10px 16px; font-size: 14px; font-weight: 700; flex-shrink: 0; margin: 0; }
-        .btn-timer-action { background-color: var(--accent-timer); }
-        .btn-schedule-action { background-color: var(--accent-auto); color: #000; }
-
-        .flex-row { display: flex; gap: 8px; }
+        .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        button { background: #333; color: white; border: none; padding: 10px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; flex: 1; min-width: 60px; transition: background 0.2s;}
+        button:hover { background: #444; }
+        button.on { background: #ff2e63; }
+        button.off { background: #00adb5; }
+        button.auto { background: #ff9f43; }
+        button.timer { background: #7b1fa2; }
+        button.danger { background: #d32f2f; }
+        button.action { background-color: var(--accent-color); }
         
         .form-group { margin-bottom: 15px; }
         label { font-size: 0.85em; color: #aaa; display: block; margin-bottom: 5px; }
         input[type="number"], input[type="text"], input[type="date"] { background: #121212; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 4px; width: 100%; box-sizing: border-box; }
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+        .sub-box { background: #252525; padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #00adb5; }
         
-        .custom-input { flex: 1; background: var(--sub-card); border: 1px solid #383838; border-radius: 12px; color: #fff; padding: 12px 14px; font-size: 15px; font-weight: 600; outline: none; }
-        .custom-input:focus { border-color: var(--accent-timer); }
-        .custom-input.schedule-input { text-align: center; padding: 12px; font-size: 14px; }
-        .custom-input.schedule-input:focus { border-color: var(--accent-auto); }
-
         .terminal { background-color: #000; color: #00ff66; font-family: 'Courier New', Courier, monospace; padding: 15px; border-radius: 6px; height: 200px; overflow-y: auto; font-size: 0.85em; line-height: 1.4; }
         .progress-bar-bg { background-color: #333; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 10px; }
-        .progress-bar-fill { background-color: var(--accent-auto); height: 100%; width: 0%; transition: width 0.4s ease; }
-        .status-text { font-size: 0.85em; color: var(--text-muted); margin-top: 5px; }
+        .progress-bar-fill { background-color: var(--accent-color); height: 100%; width: 0%; transition: width 0.4s ease; }
+        .status-text { font-size: 0.85em; color: var(--subtext-color); margin-top: 5px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="header">
-        <h1>☀️ Solar OS</h1>
-        <div id="conn-dot" class="status-dot"></div>
-    </div>
+    <h1 style="text-align: center;">☀️ Solar Infrastructure Cloud OS</h1>
     
-    <div style="text-align: center; font-size: 0.75em; color: var(--text-muted); margin-top: -5px; margin-bottom: 25px; opacity: 0.7;">
+    <!-- Subtle System Info Bar -->
+    <div style="text-align: center; font-size: 0.75em; color: var(--subtext-color); margin-top: -5px; margin-bottom: 25px; opacity: 0.7;">
         <span id="mqtt-status" style="color: #ff9f43;">🔌 Connecting to MQTT...</span> 
         &nbsp; | &nbsp; 
-        <span>🌐 Local IP: <a id="local-ip-link" href="#" target="_blank" style="color: var(--text-muted); text-decoration: none;">Fetching...</a></span>
-    </div>
-
-    <!-- ==========================================
-         TOP: PROMINENT FAN CONTROLS (RELAY 2)
-         ========================================== -->
-    <div class="primary-card">
-        <div class="device-header">
-            <div class="device-title">
-                <span>🌀</span>
-                <h2 style="font-size: 24px;">Room Fan</h2>
-            </div>
-            <div id="badge-fan" class="state-badge" style="font-size: 12px;">SYNCING...</div>
-        </div>
-        
-        <div class="controls three-col">
-            <button class="btn-on" onclick="sendCommand(2, 'ON')">ON</button>
-            <button class="btn-off" onclick="sendCommand(2, 'OFF')">OFF</button>
-            <button class="btn-auto" onclick="sendCommand(2, 'AUTOTIME')">AUTO</button>
-        </div>
-
-        <div class="timer-section">
-            <div class="timer-label">⏱️ Timers</div>
-            
-            <div class="preset-grid">
-                <button class="preset-btn" onclick="startCustomTimer(2, 15)">15m</button>
-                <button class="preset-btn" onclick="startCustomTimer(2, 30)">30m</button>
-                <button class="preset-btn" onclick="startCustomTimer(2, 60)">1h</button>
-                <button class="preset-btn" onclick="startCustomTimer(2, 120)">2h</button>
-            </div>
-            
-            <div class="slider-container">
-                <div class="slider-header">
-                    <span>Drag to set:</span>
-                    <span id="fan-slider-val" class="slider-display">45 mins</span>
-                </div>
-                <div class="slider-row">
-                    <input type="range" id="fan-slider" min="1" max="240" value="45" oninput="updateSliderText(this.value)">
-                    <button class="btn-set-action btn-timer-action" onclick="startCustomTimer(2, document.getElementById('fan-slider').value)">Start</button>
-                </div>
-            </div>
-
-            <div class="flex-row">
-                <input type="number" id="custom-fan-min" class="custom-input" placeholder="Custom mins..." min="1" max="1440">
-                <button class="btn-set-action btn-timer-action" style="border-radius: 12px;" onclick="startInputTimer(2, 'custom-fan-min')">Start</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ==========================================
-         MIDDLE: LIGHTING & DIMMERS
-         ========================================== -->
-    <div class="section-title">Lighting Controls</div>
-
-    <!-- ROOM LIGHT (RELAY 3 + DIMMER 1 on Pin 26) -->
-    <div class="secondary-card">
-        <div class="device-header">
-            <div class="device-title">
-                <span>💡</span>
-                <h2>Room Light</h2>
-            </div>
-            <div id="badge-roomlight" class="state-badge">SYNCING...</div>
-        </div>
-        
-        <div class="controls three-col" style="margin-bottom: 15px;">
-            <button class="btn-on" onclick="sendCommand(3, 'ON')">ON</button>
-            <button class="btn-off" onclick="sendCommand(3, 'OFF')">OFF</button>
-            <button class="btn-auto" onclick="sendCommand(3, 'AUTOTIME')">AUTO</button>
-        </div>
-
-        <div class="slider-container" style="margin-bottom: 15px;">
-            <div class="slider-header">
-                <span>Brightness:</span>
-                <span id="dimmer-1-val" class="dimmer-display">0%</span>
-            </div>
-            <div class="slider-row">
-                <input type="range" id="dimmer-1-slider" class="dimmer-track" min="0" max="255" value="0" 
-                    oninput="updateDimmerText(1, this.value)" 
-                    onchange="sendDimmerCommand(1, this.value)">
-            </div>
-        </div>
-        
-        <div class="timer-label" style="margin-bottom: 12px; border-top: 1px solid #2e2e2e; padding-top: 15px;">⏰ Room Light Schedule (0-23h)</div>
-        <div class="flex-row">
-            <input type="number" id="roomlight-on-h" class="custom-input schedule-input" placeholder="ON Hr" min="0" max="23">
-            <input type="number" id="roomlight-off-h" class="custom-input schedule-input" placeholder="OFF Hr" min="0" max="23">
-            <button class="btn-set-action btn-schedule-action" style="border-radius: 12px;" onclick="saveAppSchedule(3, 'roomlight-on-h', 'roomlight-off-h')">Save</button>
-        </div>
-    </div>
-
-    <!-- VESAK LANTERN (RELAY 1 + DIMMER 0 on Pin 25) -->
-    <div class="secondary-card">
-        <div class="device-header">
-            <div class="device-title">
-                <span>🏮</span>
-                <h2>Vesak Lantern</h2>
-            </div>
-            <div id="badge-lantern" class="state-badge">SYNCING...</div>
-        </div>
-        
-        <div class="controls three-col" style="margin-bottom: 15px;">
-            <button class="btn-on" onclick="sendCommand(1, 'ON')">ON</button>
-            <button class="btn-off" onclick="sendCommand(1, 'OFF')">OFF</button>
-            <button class="btn-auto" onclick="sendCommand(1, 'AUTOTIME')">AUTO</button>
-        </div>
-
-        <div class="slider-container" style="margin-bottom: 15px;">
-            <div class="slider-header">
-                <span>Brightness:</span>
-                <span id="dimmer-0-val" class="dimmer-display">0%</span>
-            </div>
-            <div class="slider-row">
-                <input type="range" id="dimmer-0-slider" class="dimmer-track" min="0" max="255" value="0" 
-                    oninput="updateDimmerText(0, this.value)" 
-                    onchange="sendDimmerCommand(0, this.value)">
-            </div>
-        </div>
-
-        <div class="timer-label" style="margin-bottom: 12px; border-top: 1px solid #2e2e2e; padding-top: 15px;">⏰ Lantern Schedule (0-23h)</div>
-        <div class="flex-row">
-            <input type="number" id="lantern-on-h" class="custom-input schedule-input" placeholder="ON Hr" min="0" max="23">
-            <input type="number" id="lantern-off-h" class="custom-input schedule-input" placeholder="OFF Hr" min="0" max="23">
-            <button class="btn-set-action btn-schedule-action" style="border-radius: 12px;" onclick="saveAppSchedule(1, 'lantern-on-h', 'lantern-off-h')">Save</button>
-        </div>
-    </div>
-
-    <div class="section-title" style="margin-top: 15px;">Advanced Schedules</div>
-
-    <!-- Fan Schedule Settings -->
-    <div class="secondary-card">
-        <div class="timer-label" style="margin-bottom: 12px;">🌀 Fan Auto Schedule (0-23h)</div>
-        <div class="flex-row">
-            <input type="number" id="fan-on-h" class="custom-input schedule-input" placeholder="ON Hr" min="0" max="23">
-            <input type="number" id="fan-off-h" class="custom-input schedule-input" placeholder="OFF Hr" min="0" max="23">
-            <button class="btn-set-action btn-schedule-action" style="border-radius: 12px;" onclick="saveAppSchedule(2, 'fan-on-h', 'fan-off-h')">Save</button>
-        </div>
+        <span>🌐 Local IP: <a id="local-ip-link" href="#" target="_blank" style="color: var(--subtext-color); text-decoration: none;">Fetching...</a></span>
     </div>
 
     <!-- MAIN FORECAST CARD -->
     <div class="card">
         <h2>📅 Billing Cycle Forecast</h2>
-        <p id="cycle-dates" style="color: var(--text-muted); margin-top: -5px;">Calculating cycle dates...</p>
+        <p id="cycle-dates" style="color: var(--subtext-color); margin-top: -5px;">Calculating cycle dates...</p>
 
         <div class="grid-3">
             <div class="metric-box">
@@ -319,7 +92,7 @@
         </div>
 
         <div style="margin-top: 20px;">
-            <div style="display: flex; justify-content: space-between; font-size: 0.85em; color: var(--text-muted);">
+            <div style="display: flex; justify-content: space-between; font-size: 0.85em; color: var(--subtext-color);">
                 <span>Cycle Progress</span>
                 <span id="cycle-progress-text">0%</span>
             </div>
@@ -335,7 +108,7 @@
         <div class="grid-4">
             <div class="metric-box">
                 <div class="label">Charged Today</div>
-                <div class="value" id="val-ah-in" style="color: var(--accent-auto);">-- <span class="unit">Ah</span></div>
+                <div class="value" id="val-ah-in" style="color: var(--accent-color);">-- <span class="unit">Ah</span></div>
             </div>
             <div class="metric-box">
                 <div class="label">Discharged Today</div>
@@ -348,7 +121,7 @@
             <div class="metric-box highlight">
                 <div class="label">Est. Runtime / Full Target</div>
                 <div class="value" id="val-time-remain" style="color: var(--warning-color);">--</div>
-                <div class="status-text" id="target-finish-time" style="font-weight: bold; color: var(--text-main);">--</div>
+                <div class="status-text" id="target-finish-time" style="font-weight: bold; color: var(--text-color);">--</div>
                 <div class="status-text" id="status-time-remain">Averaging load...</div>
             </div>
         </div>
@@ -444,21 +217,44 @@
     </div>
 
     <!-- MQTT Control Matrix -->
-    <h2>🎛️ Manual Relay Overrides</h2>
+    <h2>🎛️ Remote Relay Overrides</h2>
     <div class="grid">
         <script>
-            const relayNames = ["CEB Charger", "Vesak Lantern", "Room Fan", "Room Light"];
+            const relayNames = ["CEB Charger", "Vesak Lantern", "Master Light Switch", "House Light"];
             for (let i = 0; i < 4; i++) {
                 document.write(`
                 <div class="card">
                     <h3>Relay ${i + 1}: ${relayNames[i]}</h3>
-                    <p>Status: <span id="r_stat_${i}" style="color: var(--accent-auto); font-weight: bold;">UNKNOWN</span></p>
+                    <p>Status: <span id="r_stat_${i}" style="color: var(--accent-color); font-weight: bold;">UNKNOWN</span></p>
                     <div class="btn-group">
-                        <button class="on" style="border-radius: 4px;" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'ON')">ON</button>
-                        <button class="off" style="border-radius: 4px;" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'OFF')">OFF</button>
-                        <button class="auto" style="border-radius: 4px;" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'AUTOTIME')">TIME</button>
-                        <button class="auto" style="border-radius: 4px;" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'AUTOVOLT')">VOLT</button>
-                        <button class="timer" style="border-radius: 4px;" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'TIMER')">TIMER</button>
+                        <button class="on" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'ON')">ON</button>
+                        <button class="off" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'OFF')">OFF</button>
+                        <button class="auto" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'AUTOTIME')">TIME</button>
+                        <button class="auto" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'AUTOVOLT')">VOLT</button>
+                        <button class="timer" onclick="sendMQTT('mysolar_lk99/relay/${i}', 'TIMER')">TIMER</button>
+                    </div>
+                </div>
+                `);
+            }
+        </script>
+    </div>
+
+    <!-- Dynamic Time & Timer Schedules -->
+    <h2>📅 Dynamic Time & Timer Schedules</h2>
+    <div class="grid">
+        <script>
+            for (let i = 0; i < 4; i++) {
+                document.write(`
+                <div class="card">
+                    <h3>Relay ${i + 1}: ${relayNames[i]} Schedule</h3>
+                    <div class="sub-box">
+                        <label>Turn ON at Hour (0-23):</label>
+                        <input type="number" min="0" max="23" id="on_h_${i}" placeholder="e.g. 18">
+                        <label>Turn OFF at Hour (0-23):</label>
+                        <input type="number" min="0" max="23" id="off_h_${i}" placeholder="e.g. 6">
+                        <label>Timer Duration (Mins):</label>
+                        <input type="number" min="1" max="1440" id="timer_m_${i}" placeholder="e.g. 30">
+                        <button class="off" style="width:100%; margin-top:8px;" onclick="saveSchedule(${i})">Send Update to Relay ${i + 1}</button>
                     </div>
                 </div>
                 `);
@@ -478,7 +274,7 @@
             <input type="number" step="0.1" id="ceb_off" placeholder="e.g. 80.0">
             <label>Daily Ah Reset Hour (0-23):</label>
             <input type="number" id="ah_reset" min="0" max="23" placeholder="e.g. 6">
-            <button class="off action" style="padding: 12px; margin-top:8px;" onclick="updateConfig()">Push Settings to ESP32</button>
+            <button class="off" style="width:100%; margin-top:8px;" onclick="updateConfig()">Push Settings to ESP32</button>
         </div>
 
         <div class="card">
@@ -487,7 +283,7 @@
             <input type="number" step="0.1" id="al_v" placeholder="e.g. 10.5">
             <label>Strobe Flashing Rate (Sec):</label>
             <input type="number" id="al_strobe" placeholder="e.g. 4">
-            <button class="off action" style="padding: 12px; margin-top:8px;" onclick="updateConfig()">Push Alarm Settings</button>
+            <button class="off" style="width:100%; margin-top:8px;" onclick="updateConfig()">Push Alarm Settings</button>
         </div>
 
         <div class="card">
@@ -499,7 +295,7 @@
                 <input type="number" id="cycle_days" min="1" max="60" required>
                 <label style="margin-top: 10px;">Energy Offset (+ / - kWh)</label>
                 <input type="number" id="energy_offset" step="0.001" required>
-                <button type="submit" class="action" style="padding: 12px; margin-top:8px;">Save Cloud Forecast Settings</button>
+                <button type="submit" class="action" style="width:100%; margin-top:8px;">Save Cloud Forecast Settings</button>
                 <span id="save-status" class="status-text" style="display:block; text-align:center;"></span>
             </form>
         </div>
@@ -515,8 +311,8 @@
                 <input type="date" id="export_end" required>
             </div>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
-                <button onclick="exportToCSV('solar_telemetry')" style="border-radius: 4px; background-color: #00adb5;">📥 Telemetry</button>
-                <button onclick="exportToCSV('system_logs')" style="border-radius: 4px; background-color: #ff9f43;">📥 Logs</button>
+                <button onclick="exportToCSV('solar_telemetry')" style="background-color: #00adb5;">📥 Telemetry</button>
+                <button onclick="exportToCSV('system_logs')" style="background-color: #ff9f43;">📥 Logs</button>
             </div>
             <span id="export-status" class="status-text" style="display: block; margin-top: 10px;"></span>
         </div>
@@ -525,17 +321,17 @@
             <h3>🛠️ Calibrations & Danger Zone</h3>
             <label>Measured Current (A):</label>
             <input type="number" step="0.001" id="real_c" placeholder="e.g. 5.230">
-            <button class="auto action" style="padding: 12px; margin-top:8px;" onclick="calibrateINA()">Calibrate INA226</button>
+            <button class="auto" style="width:100%; margin-top:8px;" onclick="calibrateINA()">Calibrate INA226</button>
             
             <hr style="border-color:#333; margin:15px 0;">
             <label>Force Manual SOC (%):</label>
             <input type="number" step="0.1" id="force_soc" placeholder="e.g. 50.0">
-            <button class="timer action" style="background-color: var(--accent-timer); padding: 12px; margin-top:8px;" onclick="forceSOC()">Inject SOC to ESP32</button>
+            <button class="timer" style="width:100%; margin-top:8px;" onclick="forceSOC()">Inject SOC to ESP32</button>
             
             <hr style="border-color:#333; margin:15px 0;">
             <div style="display: flex; gap: 10px;">
-                <button class="on" style="background:#ff9f43; border-radius: 4px;" onclick="if(confirm('Wipe Ah counters back to 0 immediately?')) sendMQTT('mysolar_lk99/system/command', 'RESET_AH')">🔄 Reset AH Now</button>
-                <button class="danger" style="border-radius: 4px;" onclick="if(confirm('Execute Remote ESP32 Reboot?')) sendMQTT('mysolar_lk99/system/command', 'REBOOT')">⚠️ Reboot Device</button>
+                <button class="on" style="background:#ff9f43;" onclick="if(confirm('Wipe Ah counters back to 0 immediately?')) sendMQTT('mysolar_lk99/system/command', 'RESET_AH')">🔄 Reset AH Now</button>
+                <button class="danger" onclick="if(confirm('Execute Remote ESP32 Reboot?')) sendMQTT('mysolar_lk99/system/command', 'REBOOT')">⚠️ Reboot Device</button>
             </div>
         </div>
         
@@ -617,10 +413,12 @@
                 // Calculate target time of battery depletion
                 let finishTime = new Date(Date.now() + (hrs * 3600 * 1000));
                 let options = { hour: '2-digit', minute: '2-digit' };
-                if (hrs >= 24) options.weekday = 'short';
-                
+                if (hrs >= 24) {
+                    options.weekday = 'short';
+                }
                 targetTimeEl.innerText = `Lasts until: ${finishTime.toLocaleTimeString([], options)}`;
                 targetTimeEl.style.color = "var(--warning-color)";
+
                 timeStatus.innerText = `Draining at ${Math.abs(avgAmps).toFixed(2)}A avg`;
             } else if (avgAmps > 0.1) {
                 // Charging -> Calculate Time to 100% Full
@@ -633,16 +431,18 @@
                 // Calculate target time of full charge
                 let finishTime = new Date(Date.now() + (hrsToFull * 3600 * 1000));
                 let options = { hour: '2-digit', minute: '2-digit' };
-                if (hrsToFull >= 24) options.weekday = 'short';
-                
+                if (hrsToFull >= 24) {
+                    options.weekday = 'short';
+                }
                 targetTimeEl.innerText = `Full by: ${finishTime.toLocaleTimeString([], options)}`;
                 targetTimeEl.style.color = "var(--soc-color)";
+
                 timeStatus.innerText = `Charging at ${avgAmps.toFixed(2)}A avg`;
             } else {
                 timeBox.innerHTML = `Idle`;
-                timeBox.style.color = "var(--text-main)";
+                timeBox.style.color = "var(--text-color)";
                 targetTimeEl.innerText = `Stable state`;
-                targetTimeEl.style.color = "var(--text-muted)";
+                targetTimeEl.style.color = "var(--subtext-color)";
                 timeStatus.innerText = `Current load is negligible`;
             }
 
@@ -791,7 +591,7 @@
         });
 
         if (error) { statusEl.innerText = "Error saving settings!"; statusEl.style.color = "var(--alert-color)"; } 
-        else { statusEl.innerText = "Settings Saved!"; statusEl.style.color = "var(--accent-auto)"; setTimeout(() => statusEl.innerText = "", 3000); fetchForecastData(); }
+        else { statusEl.innerText = "Settings Saved!"; statusEl.style.color = "var(--accent-color)"; setTimeout(() => statusEl.innerText = "", 3000); fetchForecastData(); }
     });
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -861,7 +661,7 @@
             document.body.removeChild(a);
 
             statusEl.innerText = `✅ Successfully downloaded ${allData.length} rows!`;
-            statusEl.style.color = "var(--accent-auto)";
+            statusEl.style.color = "var(--accent-color)";
         } catch (err) {
             console.error("Export Error:", err);
             statusEl.innerText = "Error exporting data. Check console.";
@@ -877,80 +677,19 @@
     const clientID = "VercelDashboard-" + Math.floor(Math.random() * 10000);
     const client = new Paho.MQTT.Client(mqttBroker, mqttPort, clientID);
 
-    const connDot = document.getElementById("conn-dot");
-    const badgeFan = document.getElementById("badge-fan");
-    const badgeLantern = document.getElementById("badge-lantern");
-    const badgeRoomLight = document.getElementById("badge-roomlight");
-
-    client.onConnectionLost = onConnectionLost;
-    client.onMessageArrived = onMessageArrived;
-    client.connect({ onSuccess: onConnect, onFailure: onFailure, useSSL: true });
-
-    function onConnect() {
-        connDot.style.backgroundColor = "var(--accent-on)";
-        connDot.style.boxShadow = "0 0 10px var(--accent-on)";
-        client.subscribe("mysolar_lk99/status");
-    }
-
-    function onFailure(response) {
-        connDot.style.backgroundColor = "var(--accent-off)";
-        connDot.style.boxShadow = "0 0 10px var(--accent-off)";
-    }
-
-    function onConnectionLost(responseObject) {
+    client.onConnectionLost = (responseObject) => {
         if (responseObject.errorCode !== 0) {
-            connDot.style.backgroundColor = "#ff9f43";
-            connDot.style.boxShadow = "0 0 10px #ff9f43";
+            document.getElementById("mqtt-status").innerText = "🟡 MQTT Disconnected. Retrying...";
+            document.getElementById("mqtt-status").style.color = "#ff9f43";
             setTimeout(() => client.connect({ onSuccess: onConnect, onFailure: onFailure, useSSL: true }), 5000);
         }
-    }
+    };
 
-    function updateBadge(badgeElement, state, mode) {
-        const modes = ["OFF", "ON", "AUTO SCHEDULE", "AUTO VOLT", "TIMER ACTIVE"];
-        let modeText = modes[mode] || "UNKNOWN";
-        
-        if (state) {
-            badgeElement.innerText = mode === 4 ? "⏱️ TIMER ON" : (mode === 2 ? "⏰ AUTO ON" : "🟢 ON");
-            badgeElement.style.color = mode === 4 ? "var(--accent-timer)" : "var(--accent-on)";
-            badgeElement.style.borderColor = mode === 4 ? "var(--accent-timer)" : "var(--accent-on)";
-        } else {
-            badgeElement.innerText = "⚪ OFF";
-            badgeElement.style.color = "var(--text-muted)";
-            badgeElement.style.borderColor = "#333";
-        }
-    }
-
-    function updateDimmerText(idx, val) {
-        let percentage = Math.round((val / 255) * 100);
-        document.getElementById(`dimmer-${idx}-val`).innerText = `${percentage}%`;
-    }
-
-    function sendDimmerCommand(idx, val) {
-        if (client.isConnected()) {
-            const msg = new Paho.MQTT.Message(val.toString());
-            msg.destinationName = `mysolar_lk99/dimmer/${idx}/set`;
-            client.send(msg);
-        } else {
-            alert("App is offline. Waiting to reconnect...");
-        }
-    }
-
-    function onMessageArrived(message) {
+    client.onMessageArrived = (message) => {
         if (message.destinationName === "mysolar_lk99/status") {
             try {
                 const status = JSON.parse(message.payloadString);
-                
-                // Parse Relays
                 if (status.relays) {
-                    const lanternData = status.relays.find(r => r.id === 1);
-                    const fanData = status.relays.find(r => r.id === 2);
-                    const roomLightData = status.relays.find(r => r.id === 3);
-                    
-                    if (lanternData) updateBadge(badgeLantern, lanternData.state, lanternData.mode);
-                    if (fanData) updateBadge(badgeFan, fanData.state, fanData.mode);
-                    if (roomLightData) updateBadge(badgeRoomLight, roomLightData.state, roomLightData.mode);
-                    
-                    // Update relay statuses in the Manual Controls block
                     const modes = ["OFF", "ON", "AUTO TIME", "AUTO VOLT", "TIMER"];
                     status.relays.forEach(r => {
                         const el = document.getElementById(`r_stat_${r.id}`);
@@ -960,20 +699,8 @@
                         }
                     });
                 }
-
-                // Parse Dimmers
-                if (status.dimmers) {
-                    status.dimmers.forEach(d => {
-                        const slider = document.getElementById(`dimmer-${d.id}-slider`);
-                        // Only update slider if the user isn't currently dragging it
-                        if (slider && document.activeElement !== slider) {
-                            slider.value = d.val;
-                            updateDimmerText(d.id, d.val);
-                        }
-                    });
-                }
                 
-                // Update configurations placeholders
+                // Update placeholders with active values from the ESP32
                 if (status.ceb_on !== undefined) document.getElementById('ceb_on').placeholder = `Current: ${status.ceb_on}%`;
                 if (status.ceb_off !== undefined) document.getElementById('ceb_off').placeholder = `Current: ${status.ceb_off}%`;
                 if (status.ah_reset !== undefined) document.getElementById('ah_reset').placeholder = `Current: ${status.ah_reset}`;
@@ -981,114 +708,46 @@
                 if (status.al_strobe !== undefined) document.getElementById('al_strobe').placeholder = `Current: ${status.al_strobe}s`;
             } catch (e) { console.log("Status parse error"); }
         }
+    };
+
+    function onConnect() {
+        document.getElementById("mqtt-status").innerText = "🟢 Real-time MQTT Connected";
+        document.getElementById("mqtt-status").style.color = "#00adb5";
+        client.subscribe("mysolar_lk99/status");
     }
 
-    function sendCommand(relayIndex, command) {
+    function onFailure(response) {
+        document.getElementById("mqtt-status").innerText = "🔴 MQTT Failed: " + response.errorMessage;
+        document.getElementById("mqtt-status").style.color = "#ff2e63";
+    }
+
+    client.connect({ onSuccess: onConnect, onFailure: onFailure, useSSL: true });
+
+    function sendMQTT(topic, payload) {
         if (client.isConnected()) {
-            const msg = new Paho.MQTT.Message(command);
-            msg.destinationName = `mysolar_lk99/relay/${relayIndex}`;
+            const msg = new Paho.MQTT.Message(payload);
+            msg.destinationName = topic;
             client.send(msg);
-            
-            // Temporary sending feedback
-            if(relayIndex === 1) {
-                badgeLantern.innerText = "SENDING..."; badgeLantern.style.color = "#ff9f43";
-            } else if (relayIndex === 2) {
-                badgeFan.innerText = "SENDING..."; badgeFan.style.color = "#ff9f43";
-            } else if (relayIndex === 3) {
-                badgeRoomLight.innerText = "SENDING..."; badgeRoomLight.style.color = "#ff9f43";
-            }
-        } else {
-            alert("App is offline. Waiting to reconnect...");
-        }
+        } else { alert("MQTT not connected yet!"); }
     }
 
-    // --- DYNAMIC TIMER DISPATCHER ---
-    function updateSliderText(val) {
-        let hours = Math.floor(val / 60);
-        let mins = val % 60;
-        let display = hours > 0 ? `${hours}h ${mins}m` : `${mins} mins`;
-        document.getElementById('fan-slider-val').innerText = display;
-    }
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 6. SMART CONFIGURATION SENDER LOGIC
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    function saveSchedule(idx) {
+        const payloadObj = { idx: idx };
+        const onInput = document.getElementById(`on_h_${idx}`).value;
+        const offInput = document.getElementById(`off_h_${idx}`).value;
+        const timerInput = document.getElementById(`timer_m_${idx}`).value;
 
-    function startCustomTimer(relayIndex, minutes) {
-        if (!client.isConnected()) {
-            alert("App is offline. Waiting to reconnect...");
-            return;
-        }
+        if (onInput !== "") payloadObj.on_h = parseInt(onInput);
+        if (offInput !== "") payloadObj.off_h = parseInt(offInput);
+        if (timerInput !== "") payloadObj.timer_m = parseInt(timerInput);
 
-        const schedPayload = JSON.stringify({ idx: relayIndex, timer_m: parseInt(minutes) });
-        const schedMsg = new Paho.MQTT.Message(schedPayload);
-        schedMsg.destinationName = "mysolar_lk99/schedule/set";
-        client.send(schedMsg);
-
-        const timerMsg = new Paho.MQTT.Message("TIMER");
-        timerMsg.destinationName = `mysolar_lk99/relay/${relayIndex}`;
-        client.send(timerMsg);
-
-        let badge = null;
-        if(relayIndex === 1) badge = badgeLantern;
-        else if(relayIndex === 2) badge = badgeFan;
-        else if(relayIndex === 3) badge = badgeRoomLight;
+        if (Object.keys(payloadObj).length === 1) { alert("Please enter a value."); return; }
+        sendMQTT("mysolar_lk99/schedule/set", JSON.stringify(payloadObj));
         
-        let hours = Math.floor(minutes / 60);
-        let mins = minutes % 60;
-        let displayStr = hours > 0 ? `${hours}H ${mins}M` : `${mins}M`;
-        
-        if (badge) {
-            badge.innerText = `⏱️ ${displayStr} SET`;
-            badge.style.color = "var(--accent-timer)";
-            badge.style.borderColor = "var(--accent-timer)";
-        }
-    }
-
-    function startInputTimer(relayIndex, inputId) {
-        const input = document.getElementById(inputId);
-        const mins = parseInt(input.value);
-        if (!mins || mins <= 0) {
-            alert("Please enter a valid number of minutes.");
-            return;
-        }
-        startCustomTimer(relayIndex, mins);
-        input.value = "";
-    }
-
-    // --- AUTO SCHEDULE DISPATCHER ---
-    function saveAppSchedule(relayIndex, onId, offId) {
-        if (!client.isConnected()) {
-            alert("App is offline. Waiting to reconnect...");
-            return;
-        }
-
-        const payloadObj = { idx: relayIndex };
-        const onVal = document.getElementById(onId).value;
-        const offVal = document.getElementById(offId).value;
-
-        if (onVal !== "") payloadObj.on_h = parseInt(onVal);
-        if (offVal !== "") payloadObj.off_h = parseInt(offVal);
-
-        if (Object.keys(payloadObj).length === 1) {
-            alert("Please enter at least one hour (0-23) to save.");
-            return;
-        }
-
-        const schedPayload = JSON.stringify(payloadObj);
-        const schedMsg = new Paho.MQTT.Message(schedPayload);
-        schedMsg.destinationName = "mysolar_lk99/schedule/set";
-        client.send(schedMsg);
-
-        document.getElementById(onId).value = "";
-        document.getElementById(offId).value = "";
-
-        let badge = null;
-        if(relayIndex === 1) badge = badgeLantern;
-        else if(relayIndex === 2) badge = badgeFan;
-        else if(relayIndex === 3) badge = badgeRoomLight;
-        
-        if (badge) {
-            badge.innerText = "⏰ SCHED SET";
-            badge.style.color = "var(--accent-auto)";
-            badge.style.borderColor = "var(--accent-auto)";
-        }
+        document.getElementById(`on_h_${idx}`).value = ""; document.getElementById(`off_h_${idx}`).value = ""; document.getElementById(`timer_m_${idx}`).value = "";
     }
 
     function updateConfig() {
@@ -1106,6 +765,7 @@
         if (alStrobe !== "") payloadObj.al_strobe = parseInt(alStrobe);
 
         if (Object.keys(payloadObj).length === 0) { alert("Please enter at least one setting to update."); return; }
+        
         sendMQTT("mysolar_lk99/config/set", JSON.stringify(payloadObj));
         
         document.getElementById("ceb_on").value = ""; 
@@ -1133,6 +793,7 @@
     fetchCoreTelemetry(); fetchLogs(); fetchForecastData(); fetchDailyHealthStats();
     setInterval(() => { fetchCoreTelemetry(); fetchForecastData(); fetchDailyHealthStats(); }, 15000);
     setInterval(fetchLogs, 5000);
+
 </script>
 </body>
 </html>
