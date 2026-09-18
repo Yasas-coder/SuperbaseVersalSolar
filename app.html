@@ -154,7 +154,7 @@
     </div>
 
     <!-- ==========================================
-         1. ROOM FAN (ORIGINAL PRESERVED)
+         1. ROOM FAN (Relay 2)
          ========================================== -->
     <div class="primary-card">
         <div class="device-header">
@@ -199,7 +199,7 @@
     </div>
 
     <!-- ==========================================
-         2. ROOM LIGHT (FULL DIMMER LOGIC)
+         2. ROOM LIGHT (Dimmer 1 - Pin 26)
          ========================================== -->
     <div class="primary-card">
         <div class="device-header">
@@ -234,21 +234,37 @@
     </div>
 
     <!-- ==========================================
-         3. VESAK LANTERN (RELAY LOGIC)
+         3. VESAK LANTERN (Dimmer 0 - Pin 25)
          ========================================== -->
-    <div class="secondary-card">
+    <div class="primary-card" style="margin-bottom: 25px;">
         <div class="device-header">
             <div class="device-title">
                 <span>🏮</span>
-                <h2>Vesak Lantern</h2>
+                <h2 style="font-size: 24px;">Vesak Lantern</h2>
             </div>
-            <div id="badge-lantern" class="state-badge">SYNCING...</div>
+            <div id="badge-lantern" class="state-badge" style="font-size: 12px;">SYNCING...</div>
         </div>
         
-        <div class="controls three-col" style="margin-bottom: 0;">
-            <button class="btn-on" onclick="sendRelayCommand(1, 'ON')">ON</button>
-            <button class="btn-off" onclick="sendRelayCommand(1, 'OFF')">OFF</button>
-            <button class="btn-auto" onclick="sendRelayCommand(1, 'AUTOTIME')">AUTO</button>
+        <div class="slider-container">
+            <div class="slider-header">
+                <span>Brightness:</span>
+                <span id="dimmer-0-val" class="dimmer-display">0%</span>
+            </div>
+            <div class="slider-row">
+                <input type="range" id="dimmer-0-slider" class="dimmer-track" min="0" max="255" value="0" 
+                    oninput="updateDimmerText(0, this.value)" 
+                    onchange="sendDimmerValue(0, this.value)">
+            </div>
+        </div>
+
+        <div class="controls three-col">
+            <button class="btn-on" onclick="sendDimmerMode(0, 'ON')">ON</button>
+            <button class="btn-off" onclick="sendDimmerMode(0, 'OFF')">OFF</button>
+            <button class="btn-auto" onclick="sendDimmerMode(0, 'AUTOTIME')">AUTO</button>
+        </div>
+        <div class="controls">
+            <button class="btn-breathe" onclick="sendDimmerMode(0, 'BREATHE')">BREATHE</button>
+            <button class="btn-timer" onclick="sendDimmerMode(0, 'TIMER')">TIMER</button>
         </div>
     </div>
 
@@ -280,7 +296,8 @@
         <div class="flex-row">
             <input type="number" id="lantern-on-h" class="custom-input schedule-input" placeholder="ON Hr" min="0" max="23">
             <input type="number" id="lantern-off-h" class="custom-input schedule-input" placeholder="OFF Hr" min="0" max="23">
-            <button class="btn-set-action btn-schedule-action" onclick="saveAppSchedule(1, 'lantern-on-h', 'lantern-off-h', 'relay')">Save</button>
+            <!-- Note: Vesak Lantern is now on Dimmer 0 -->
+            <button class="btn-set-action btn-schedule-action" onclick="saveAppSchedule(0, 'lantern-on-h', 'lantern-off-h', 'dimmer')">Save</button>
         </div>
     </div>
 
@@ -354,19 +371,29 @@
                     const status = JSON.parse(message.payloadString);
                     
                     if (status.relays) {
-                        const lanternData = status.relays.find(r => r.id === 1);
                         const fanData = status.relays.find(r => r.id === 2);
-                        if (lanternData) updateRelayBadge(badgeLantern, lanternData.state, lanternData.mode);
                         if (fanData) updateRelayBadge(badgeFan, fanData.state, fanData.mode);
                     }
 
                     if (status.dimmers) {
+                        // Vesak Lantern is Dimmer 0
+                        const vesakData = status.dimmers.find(d => d.id === 0);
+                        if (vesakData) {
+                            updateDimmerBadge(badgeLantern, vesakData.mode);
+                            const slider0 = document.getElementById(`dimmer-0-slider`);
+                            if (slider0 && document.activeElement !== slider0) {
+                                slider0.value = vesakData.val;
+                                updateDimmerText(0, vesakData.val);
+                            }
+                        }
+
+                        // Room Light is Dimmer 1
                         const roomLightData = status.dimmers.find(d => d.id === 1);
                         if (roomLightData) {
                             updateDimmerBadge(badgeRoomLight, roomLightData.mode);
-                            const slider = document.getElementById(`dimmer-1-slider`);
-                            if (slider && document.activeElement !== slider) {
-                                slider.value = roomLightData.val;
+                            const slider1 = document.getElementById(`dimmer-1-slider`);
+                            if (slider1 && document.activeElement !== slider1) {
+                                slider1.value = roomLightData.val;
                                 updateDimmerText(1, roomLightData.val);
                             }
                         }
@@ -382,8 +409,7 @@
                 msg.destinationName = `mysolar_lk99/relay/${idx}`;
                 client.send(msg);
                 
-                const badge = idx === 2 ? badgeFan : badgeLantern;
-                badge.innerText = "SENDING..."; badge.style.color = "#ff9f43";
+                if(idx === 2) { badgeFan.innerText = "SENDING..."; badgeFan.style.color = "#ff9f43"; }
             } else { alert("App is offline."); }
         }
 
@@ -392,7 +418,9 @@
                 const msg = new Paho.MQTT.Message(modeCmd);
                 msg.destinationName = `mysolar_lk99/dimmer/${idx}`;
                 client.send(msg);
-                badgeRoomLight.innerText = "SENDING..."; badgeRoomLight.style.color = "#ff9f43";
+                
+                if (idx === 0) { badgeLantern.innerText = "SENDING..."; badgeLantern.style.color = "#ff9f43"; }
+                if (idx === 1) { badgeRoomLight.innerText = "SENDING..."; badgeRoomLight.style.color = "#ff9f43"; }
             } else { alert("App is offline."); }
         }
 
