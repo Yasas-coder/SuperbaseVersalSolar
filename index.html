@@ -20,6 +20,7 @@
             --soc-color: #4cd137;
             --text-color: #e0e0e0;
             --subtext-color: #aaa;
+            --accent-dimmer: #f1c40f;
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
         .container { max-width: 1100px; margin: 0 auto; }
@@ -40,10 +41,12 @@
         .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
         button { background: #333; color: white; border: none; padding: 10px 12px; border-radius: 5px; cursor: pointer; font-weight: bold; flex: 1; min-width: 60px; transition: background 0.2s;}
         button:hover { background: #444; }
+        button:active { transform: scale(0.96); }
         button.on { background: #ff2e63; }
         button.off { background: #00adb5; }
         button.auto { background: #ff9f43; }
         button.timer { background: #7b1fa2; }
+        button.breathe { background: #0984e3; }
         button.danger { background: #d32f2f; }
         button.action { background-color: var(--accent-color); }
         
@@ -57,6 +60,11 @@
         .progress-bar-bg { background-color: #333; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 10px; }
         .progress-bar-fill { background-color: var(--accent-color); height: 100%; width: 0%; transition: width 0.4s ease; }
         .status-text { font-size: 0.85em; color: var(--subtext-color); margin-top: 5px; }
+
+        .slider-container { width: 100%; margin-top: 10px; }
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 24px; width: 24px; border-radius: 50%; background: var(--accent-dimmer); cursor: pointer; margin-top: -9px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: #444; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -64,7 +72,6 @@
 <div class="container">
     <h1 style="text-align: center;">☀️ Solar Infrastructure Cloud OS</h1>
     
-    <!-- Subtle System Info Bar -->
     <div style="text-align: center; font-size: 0.75em; color: var(--subtext-color); margin-top: -5px; margin-bottom: 25px; opacity: 0.7;">
         <span id="mqtt-status" style="color: #ff9f43;">🔌 Connecting to MQTT...</span> 
         &nbsp; | &nbsp; 
@@ -75,7 +82,6 @@
     <div class="card">
         <h2>📅 Billing Cycle Forecast</h2>
         <p id="cycle-dates" style="color: var(--subtext-color); margin-top: -5px;">Calculating cycle dates...</p>
-
         <div class="grid-3">
             <div class="metric-box">
                 <div class="label">Used So Far</div>
@@ -90,7 +96,6 @@
                 <div class="value" id="val-forecast" style="color: var(--warning-color);">-- <span class="unit">kWh</span></div>
             </div>
         </div>
-
         <div style="margin-top: 20px;">
             <div style="display: flex; justify-content: space-between; font-size: 0.85em; color: var(--subtext-color);">
                 <span>Cycle Progress</span>
@@ -217,10 +222,10 @@
     </div>
 
     <!-- MQTT Control Matrix -->
-    <h2>🎛️ Remote Relay Overrides</h2>
+    <h2>🎛️ Manual Relay Overrides</h2>
     <div class="grid">
         <script>
-            const relayNames = ["CEB Charger", "Vesak Lantern", "Master Light Switch", "House Light"];
+            const relayNames = ["CEB Transformer", "CCTV", "Bed Fan", "House Light"];
             for (let i = 0; i < 4; i++) {
                 document.write(`
                 <div class="card">
@@ -239,10 +244,44 @@
         </script>
     </div>
 
-    <!-- Dynamic Time & Timer Schedules -->
-    <h2>📅 Dynamic Time & Timer Schedules</h2>
+    <!-- MOSFET Dimmer Matrix -->
+    <h2>💡 MOSFET Dimmer Overrides</h2>
     <div class="grid">
         <script>
+            const dimmerNames = ["Aux Dimmer (Pin 25)", "Room Light (Pin 26)"];
+            for (let i = 0; i < 2; i++) {
+                document.write(`
+                <div class="card">
+                    <h3>Dimmer ${i + 1}: ${dimmerNames[i]}</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <p style="margin:0;">Status: <span id="d_stat_${i}" style="color: var(--accent-color); font-weight: bold;">UNKNOWN</span></p>
+                        <span id="d_val_${i}" style="font-size: 1.2em; font-weight: bold; color: var(--accent-dimmer);">0%</span>
+                    </div>
+                    
+                    <div class="slider-container">
+                        <input type="range" id="d_slider_${i}" class="dimmer-track" min="0" max="255" value="0" 
+                            oninput="updateDimmerText(${i}, this.value)" 
+                            onchange="sendDimmerValue(${i}, this.value)">
+                    </div>
+
+                    <div class="btn-group" style="margin-top: 15px;">
+                        <button class="on" onclick="sendMQTT('mysolar_lk99/dimmer/${i}', 'ON')">ON</button>
+                        <button class="off" onclick="sendMQTT('mysolar_lk99/dimmer/${i}', 'OFF')">OFF</button>
+                        <button class="auto" onclick="sendMQTT('mysolar_lk99/dimmer/${i}', 'AUTOTIME')">TIME</button>
+                        <button class="breathe" onclick="sendMQTT('mysolar_lk99/dimmer/${i}', 'BREATHE')">BREATHE</button>
+                        <button class="timer" onclick="sendMQTT('mysolar_lk99/dimmer/${i}', 'TIMER')">TIMER</button>
+                    </div>
+                </div>
+                `);
+            }
+        </script>
+    </div>
+
+    <!-- Dynamic Time & Timer Schedules -->
+    <h2>📅 Dynamic Schedules & Timers</h2>
+    <div class="grid">
+        <script>
+            // Relay Schedules
             for (let i = 0; i < 4; i++) {
                 document.write(`
                 <div class="card">
@@ -254,7 +293,25 @@
                         <input type="number" min="0" max="23" id="off_h_${i}" placeholder="e.g. 6">
                         <label>Timer Duration (Mins):</label>
                         <input type="number" min="1" max="1440" id="timer_m_${i}" placeholder="e.g. 30">
-                        <button class="off" style="width:100%; margin-top:8px;" onclick="saveSchedule(${i})">Send Update to Relay ${i + 1}</button>
+                        <button class="off" style="width:100%; margin-top:8px;" onclick="saveSchedule(${i}, 'relay')">Send Update to Relay ${i + 1}</button>
+                    </div>
+                </div>
+                `);
+            }
+            
+            // Dimmer Schedules
+            for (let i = 0; i < 2; i++) {
+                document.write(`
+                <div class="card" style="border-left: 4px solid var(--accent-dimmer);">
+                    <h3 style="color: var(--accent-dimmer);">Dimmer ${i + 1}: ${dimmerNames[i]} Schedule</h3>
+                    <div class="sub-box">
+                        <label>Turn ON at Hour (0-23):</label>
+                        <input type="number" min="0" max="23" id="d_on_h_${i}" placeholder="e.g. 18">
+                        <label>Turn OFF at Hour (0-23):</label>
+                        <input type="number" min="0" max="23" id="d_off_h_${i}" placeholder="e.g. 6">
+                        <label>Timer Duration (Mins):</label>
+                        <input type="number" min="1" max="1440" id="d_timer_m_${i}" placeholder="e.g. 30">
+                        <button class="breathe" style="width:100%; margin-top:8px;" onclick="saveSchedule(${i}, 'dimmer')">Send Update to Dimmer ${i + 1}</button>
                     </div>
                 </div>
                 `);
@@ -265,7 +322,6 @@
     <!-- System Configurations & Commands -->
     <h2>⚙️ System Boundaries & Web Configurations</h2>
     <div class="grid">
-        
         <div class="card">
             <h3>⚡ System Boundaries (MQTT)</h3>
             <label>Turn ON Target (SOC %):</label>
@@ -334,7 +390,6 @@
                 <button class="danger" onclick="if(confirm('Execute Remote ESP32 Reboot?')) sendMQTT('mysolar_lk99/system/command', 'REBOOT')">⚠️ Reboot Device</button>
             </div>
         </div>
-        
     </div>
 </div>
 
@@ -367,18 +422,15 @@
             if (!data || data.length === 0) return;
 
             const latest = data[0];
-
             if (latest.local_ip) {
                 const ipLink = document.getElementById("local-ip-link");
                 ipLink.innerText = latest.local_ip;
                 ipLink.href = `http://${latest.local_ip}`;
             }
 
-            // --- POPULATE LIVE METRICS ---
             if (latest.soc !== undefined) document.getElementById('val-live-soc').innerHTML = `${latest.soc.toFixed(1)} <span class="unit">%</span>`;
             if (latest.battery_v !== undefined) document.getElementById('val-live-v').innerHTML = `${latest.battery_v.toFixed(2)} <span class="unit">V</span>`;
 
-            // --- CAPACITY & RUNTIME CALCULATIONS ---
             if (latest.ah_charged !== undefined && latest.ah_charged !== null) {
                 document.getElementById('val-ah-in').innerHTML = `${latest.ah_charged.toFixed(2)} <span class="unit">Ah</span>`;
             }
@@ -392,7 +444,6 @@
                 document.getElementById('val-ah-remain').innerHTML = `${remainingAh.toFixed(2)} <span class="unit">Ah</span>`;
             }
 
-            // Average the last ~2 minutes (4 points of 30sec intervals) for stable Time Remaining
             let avgAmps = 0;
             let count = Math.min(data.length, 4);
             for(let i=0; i<count; i++) { avgAmps += data[i].battery_a; }
@@ -403,50 +454,37 @@
             const timeStatus = document.getElementById('status-time-remain');
 
             if (avgAmps < -0.1) {
-                // Discharging -> Calculate Time to Empty
                 let hrs = remainingAh / Math.abs(avgAmps);
                 let h = Math.floor(hrs);
                 let m = Math.round((hrs - h) * 60);
                 timeBox.innerHTML = `${h}h ${m}m`;
                 timeBox.style.color = "var(--alert-color)";
 
-                // Calculate target time of battery depletion
                 let finishTime = new Date(Date.now() + (hrs * 3600 * 1000));
                 let options = { hour: '2-digit', minute: '2-digit' };
-                if (hrs >= 24) {
-                    options.weekday = 'short';
-                }
+                if (hrs >= 24) options.weekday = 'short';
                 targetTimeEl.innerText = `Lasts until: ${finishTime.toLocaleTimeString([], options)}`;
                 targetTimeEl.style.color = "var(--warning-color)";
-
                 timeStatus.innerText = `Draining at ${Math.abs(avgAmps).toFixed(2)}A avg`;
             } else if (avgAmps > 0.1) {
-                // Charging -> Calculate Time to 100% Full
                 let hrsToFull = (BATTERY_CAPACITY_AH - remainingAh) / avgAmps;
                 let h = Math.floor(hrsToFull);
                 let m = Math.round((hrsToFull - h) * 60);
                 timeBox.innerHTML = `${h}h ${m}m`;
                 timeBox.style.color = "var(--soc-color)";
 
-                // Calculate target time of full charge
                 let finishTime = new Date(Date.now() + (hrsToFull * 3600 * 1000));
                 let options = { hour: '2-digit', minute: '2-digit' };
-                if (hrsToFull >= 24) {
-                    options.weekday = 'short';
-                }
+                if (hrsToFull >= 24) options.weekday = 'short';
                 targetTimeEl.innerText = `Full by: ${finishTime.toLocaleTimeString([], options)}`;
                 targetTimeEl.style.color = "var(--soc-color)";
-
                 timeStatus.innerText = `Charging at ${avgAmps.toFixed(2)}A avg`;
             } else {
-                timeBox.innerHTML = `Idle`;
-                timeBox.style.color = "var(--text-color)";
-                targetTimeEl.innerText = `Stable state`;
-                targetTimeEl.style.color = "var(--subtext-color)";
+                timeBox.innerHTML = `Idle`; timeBox.style.color = "var(--text-color)";
+                targetTimeEl.innerText = `Stable state`; targetTimeEl.style.color = "var(--subtext-color)";
                 timeStatus.innerText = `Current load is negligible`;
             }
 
-            // Reverse data arrays for chart rendering (left to right)
             data.reverse();
             const timestamps = data.map(row => new Date(row.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
             const batteryV = data.map(row => row.battery_v);
@@ -594,53 +632,29 @@
         else { statusEl.innerText = "Settings Saved!"; statusEl.style.color = "var(--accent-color)"; setTimeout(() => statusEl.innerText = "", 3000); fetchForecastData(); }
     });
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 4. DATA EXPORT FUNCTION
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     async function exportToCSV(tableName) {
         const startInput = document.getElementById('export_start').value;
         const endInput = document.getElementById('export_end').value;
         const statusEl = document.getElementById('export-status');
 
-        if (!startInput || !endInput) {
-            statusEl.innerText = "⚠️ Please select both a Start Date and End Date.";
-            statusEl.style.color = "var(--alert-color)";
-            return;
-        }
+        if (!startInput || !endInput) { statusEl.innerText = "⚠️ Please select both dates."; statusEl.style.color = "var(--alert-color)"; return; }
 
-        statusEl.innerText = `Fetching records from ${tableName}... Please wait.`;
+        statusEl.innerText = `Fetching records from ${tableName}...`;
         statusEl.style.color = "var(--warning-color)";
 
-        let allData = [];
-        let from = 0;
-        let step = 999;
-        let hasMore = true;
+        let allData = []; let from = 0; let step = 999; let hasMore = true;
 
         try {
             while (hasMore) {
-                const { data, error } = await _supabase
-                    .from(tableName)
-                    .select('*')
-                    .gte('created_at', `${startInput}T00:00:00.000Z`)
-                    .lte('created_at', `${endInput}T23:59:59.999Z`)
-                    .order('created_at', { ascending: true })
-                    .range(from, from + step);
-
+                const { data, error } = await _supabase.from(tableName).select('*').gte('created_at', `${startInput}T00:00:00.000Z`).lte('created_at', `${endInput}T23:59:59.999Z`).order('created_at', { ascending: true }).range(from, from + step);
                 if (error) throw error;
                 if (data.length > 0) { allData = allData.concat(data); from += step + 1; }
                 if (data.length <= step) { hasMore = false; }
             }
-
-            if (allData.length === 0) {
-                statusEl.innerText = "No data found for this date range.";
-                statusEl.style.color = "var(--alert-color)";
-                return;
-            }
+            if (allData.length === 0) { statusEl.innerText = "No data found."; statusEl.style.color = "var(--alert-color)"; return; }
 
             const headers = Object.keys(allData[0]);
-            const csvRows = [];
-            csvRows.push(headers.join(','));
-
+            const csvRows = []; csvRows.push(headers.join(','));
             for (const row of allData) {
                 const values = headers.map(header => {
                     const val = row[header] !== null ? row[header] : '';
@@ -653,20 +667,10 @@
             const csvString = csvRows.join('\n');
             const blob = new Blob([csvString], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Solar_${tableName}_${startInput}_to_${endInput}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-
-            statusEl.innerText = `✅ Successfully downloaded ${allData.length} rows!`;
-            statusEl.style.color = "var(--accent-color)";
-        } catch (err) {
-            console.error("Export Error:", err);
-            statusEl.innerText = "Error exporting data. Check console.";
-            statusEl.style.color = "var(--alert-color)";
-        }
+            const a = document.createElement('a'); a.href = url; a.download = `Solar_${tableName}_${startInput}_to_${endInput}.csv`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            statusEl.innerText = `✅ Downloaded ${allData.length} rows!`; statusEl.style.color = "var(--accent-color)";
+        } catch (err) { statusEl.innerText = "Error exporting data."; statusEl.style.color = "var(--alert-color)"; }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -689,6 +693,8 @@
         if (message.destinationName === "mysolar_lk99/status") {
             try {
                 const status = JSON.parse(message.payloadString);
+                
+                // Parse Relays
                 if (status.relays) {
                     const modes = ["OFF", "ON", "AUTO TIME", "AUTO VOLT", "TIMER"];
                     status.relays.forEach(r => {
@@ -699,8 +705,25 @@
                         }
                     });
                 }
+
+                // Parse Dimmers
+                if (status.dimmers) {
+                    const d_modes = ["OFF", "ON", "AUTO TIME", "TIMER", "BREATHE"];
+                    status.dimmers.forEach(d => {
+                        const statEl = document.getElementById(`d_stat_${d.id}`);
+                        if (statEl) {
+                            statEl.innerText = `[${d_modes[d.mode]}]`;
+                            statEl.style.color = (d.mode === 0) ? '#00adb5' : ((d.mode === 4) ? '#0984e3' : '#ff2e63');
+                        }
+                        
+                        const slider = document.getElementById(`d_slider_${d.id}`);
+                        if (slider && document.activeElement !== slider) {
+                            slider.value = d.val;
+                            updateDimmerText(d.id, d.val);
+                        }
+                    });
+                }
                 
-                // Update placeholders with active values from the ESP32
                 if (status.ceb_on !== undefined) document.getElementById('ceb_on').placeholder = `Current: ${status.ceb_on}%`;
                 if (status.ceb_off !== undefined) document.getElementById('ceb_off').placeholder = `Current: ${status.ceb_off}%`;
                 if (status.ah_reset !== undefined) document.getElementById('ah_reset').placeholder = `Current: ${status.ah_reset}`;
@@ -731,23 +754,37 @@
         } else { alert("MQTT not connected yet!"); }
     }
 
+    function sendDimmerValue(idx, val) {
+        sendMQTT(`mysolar_lk99/dimmer/${idx}/set`, val.toString());
+    }
+
+    function updateDimmerText(idx, val) {
+        let percentage = Math.round((val / 255) * 100);
+        document.getElementById(`d_val_${idx}`).innerText = `${percentage}%`;
+    }
+
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 6. SMART CONFIGURATION SENDER LOGIC
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    function saveSchedule(idx) {
+    function saveSchedule(idx, type) {
         const payloadObj = { idx: idx };
-        const onInput = document.getElementById(`on_h_${idx}`).value;
-        const offInput = document.getElementById(`off_h_${idx}`).value;
-        const timerInput = document.getElementById(`timer_m_${idx}`).value;
+        if (type === 'dimmer') payloadObj.type = "dimmer";
+
+        const prefix = (type === 'dimmer') ? 'd_' : '';
+        const onInput = document.getElementById(`${prefix}on_h_${idx}`).value;
+        const offInput = document.getElementById(`${prefix}off_h_${idx}`).value;
+        const timerInput = document.getElementById(`${prefix}timer_m_${idx}`).value;
 
         if (onInput !== "") payloadObj.on_h = parseInt(onInput);
         if (offInput !== "") payloadObj.off_h = parseInt(offInput);
         if (timerInput !== "") payloadObj.timer_m = parseInt(timerInput);
 
-        if (Object.keys(payloadObj).length === 1) { alert("Please enter a value."); return; }
+        if (Object.keys(payloadObj).length === (type === 'dimmer' ? 2 : 1)) { alert("Please enter a value."); return; }
         sendMQTT("mysolar_lk99/schedule/set", JSON.stringify(payloadObj));
         
-        document.getElementById(`on_h_${idx}`).value = ""; document.getElementById(`off_h_${idx}`).value = ""; document.getElementById(`timer_m_${idx}`).value = "";
+        document.getElementById(`${prefix}on_h_${idx}`).value = ""; 
+        document.getElementById(`${prefix}off_h_${idx}`).value = ""; 
+        document.getElementById(`${prefix}timer_m_${idx}`).value = "";
     }
 
     function updateConfig() {
@@ -765,7 +802,6 @@
         if (alStrobe !== "") payloadObj.al_strobe = parseInt(alStrobe);
 
         if (Object.keys(payloadObj).length === 0) { alert("Please enter at least one setting to update."); return; }
-        
         sendMQTT("mysolar_lk99/config/set", JSON.stringify(payloadObj));
         
         document.getElementById("ceb_on").value = ""; 
@@ -789,7 +825,6 @@
         document.getElementById("force_soc").value = "";
     }
 
-    // INITIAL LOADS & INTERVALS
     fetchCoreTelemetry(); fetchLogs(); fetchForecastData(); fetchDailyHealthStats();
     setInterval(() => { fetchCoreTelemetry(); fetchForecastData(); fetchDailyHealthStats(); }, 15000);
     setInterval(fetchLogs, 5000);
